@@ -20,7 +20,8 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "test": "npm run build && node --test test/",
+    "pretest": "npm run build && tsc -p tsconfig.test.json && node -e \"fs.cpSync('test/fixtures','dist-test/test/fixtures',{recursive:true})\"",
+    "test": "node --test \"dist-test/test/*.test.js\"",
     "prepack": "npm run build"
   },
   "keywords": [
