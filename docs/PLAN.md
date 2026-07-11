@@ -2,6 +2,8 @@
 
 Source of reference for all implementation. Read `docs/ARCHITECTURE.md` and `docs/decisions/ADR-*.md` first; research facts live in `docs/research/`. Rules for every phase: zero runtime deps (ADR-004), never touch credentials (ADR-002), hooks always exit 0, token-spending paths opt-in only (ADR-003), all estimates labeled as estimates. Phase N+1 starts only when phase N's acceptance criteria pass via `npm test`.
 
+> Status (2026-07-11): P0 ✅ · P1 ✅ (committed e5d81c7; real-transcript validated) · P2 in review loop (see docs/PHASE2-SPEC.md — binding command contracts added after first attempt shipped placeholder facades) · P3+ pending.
+
 ## Phase 0 — Scaffold ✅ (done in planning session)
 package.json / tsconfig / .gitignore / LICENSE / README stub / CLAUDE.md / .claude/settings.json / docs corpus.
 

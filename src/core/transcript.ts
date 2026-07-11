@@ -66,6 +66,8 @@ export interface ParsedSession {
   toolUses: Array<{ name: string; input: unknown }>; // Flattened from turns
   compactSummaries: string[];
   parseErrors: Array<{ lineNo: number; error: string }>;
+  /** Total JSONL lines seen (parsed + malformed) — denominator for error rates. */
+  lineCount: number;
 }
 
 /**
@@ -78,9 +80,11 @@ export interface ParsedSession {
 export async function parseSession(path: string): Promise<ParsedSession> {
   const lines: TranscriptLine[] = [];
   const parseErrors: Array<{ lineNo: number; error: string }> = [];
+  let lineCount = 0;
 
   // Read and parse all lines
   for await (const entry of readJsonlLines(path)) {
+    lineCount++;
     if (entry.error) {
       parseErrors.push({ lineNo: entry.lineNo, error: entry.error });
     } else if (entry.value) {
@@ -314,6 +318,7 @@ export async function parseSession(path: string): Promise<ParsedSession> {
     toolUses,
     compactSummaries,
     parseErrors,
+    lineCount,
   };
 }
 

@@ -125,13 +125,41 @@ export function currentProfile(): ProfileInfo | undefined {
 }
 
 /**
+ * Resolve the profile a command should act as, in spec order:
+ * explicit flag -> CLAUDE_CONFIG_DIR match -> first registered profile.
+ * Runs adoptDefault() first so a bare `~/.claude` machine self-registers.
+ * Returns undefined when the flag names an unknown profile or the registry
+ * is empty; callers distinguish the two by whether they passed a flag.
+ */
+export function resolveActingProfile(
+  flagProfile?: string
+): ProfileInfo | undefined {
+  adoptDefault();
+  const config = loadConfig();
+
+  if (flagProfile) {
+    const pCfg = config.profiles[flagProfile];
+    if (!pCfg) return undefined;
+    return { name: flagProfile, configDir: pCfg.configDir, label: pCfg.label };
+  }
+
+  return currentProfile();
+}
+
+/**
  * Get a hint about whether a profile is logged in.
  * Reads the profile's .claude.json oauthAccount fields if present.
  * Returns email + organization name if available, otherwise "not logged in".
  */
 export function loggedInHint(profileInfo: ProfileInfo): string {
-  const claudeJsonPath = join(profileInfo.configDir, ".claude.json");
-  if (!existsSync(claudeJsonPath)) {
+  // CLAUDE_CONFIG_DIR profiles keep .claude.json inside the dir; the default
+  // ~/.claude install keeps it as a sibling (~/.claude.json). Try both.
+  const candidates = [
+    join(profileInfo.configDir, ".claude.json"),
+    `${profileInfo.configDir}.json`,
+  ];
+  const claudeJsonPath = candidates.find((p) => existsSync(p));
+  if (!claudeJsonPath) {
     return "not logged in";
   }
 
