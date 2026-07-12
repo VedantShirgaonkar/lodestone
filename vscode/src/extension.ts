@@ -9,6 +9,7 @@ import {
   buildStatusText,
   buildTooltipMarkdown,
   parseAuditTotals,
+  expiryToastDecisions,
   StatusModel,
 } from "./model.js";
 import { locateCli, runJson, clearCache } from "./cli.js";
@@ -17,6 +18,8 @@ let statusBarItem: vscode.StatusBarItem;
 let refreshInterval: NodeJS.Timeout | null = null;
 // node:fs watchers expose close(), not vscode's dispose()
 const watchers: Array<{ close(): void }> = [];
+// Track which cache expiry toasts we've already shown (to avoid duplicate per warm-period)
+const toastedKeys: Set<string> = new Set();
 
 /**
  * Extension activation: create statusbar, set up watchers, register commands.
@@ -146,6 +149,22 @@ async function updateStatus() {
     }
 
     statusBarItem.show();
+
+    // Check for expiry toasts
+    const expiryToastMinutes =
+      vscode.workspace
+        .getConfiguration("warmswap")
+        .get<number>("expiryToastMinutes") ?? 0;
+    if (expiryToastMinutes > 0) {
+      const toastDecisions = expiryToastDecisions(
+        model.cacheWarmth,
+        expiryToastMinutes,
+        toastedKeys
+      );
+      for (const decision of toastDecisions) {
+        showExpiryToast(decision.folder, decision.minutesRemaining);
+      }
+    }
   } catch (err) {
     // Graceful degradation
     statusBarItem.text = "$(error) warmswap error";
@@ -229,6 +248,8 @@ async function buildStatusModel(): Promise<StatusModel> {
 async function handleMenu() {
   const actions = [
     { label: "Handoff & Switch Account…", value: "handoff" },
+    { label: "Refresh In Place…", value: "refresh-in-place" },
+    { label: "Trail Mode: toggle", value: "trail-toggle" },
     { label: "Keep Current Account Warm…", value: "keepWarm" },
     { label: "Open Dashboard (terminal)", value: "dash" },
     { label: "Refresh Status", value: "refresh" },
@@ -244,6 +265,10 @@ async function handleMenu() {
   switch (picked.value) {
     case "handoff":
       return handleHandoffSwitch();
+    case "refresh-in-place":
+      return runInTerminal("warmswap refresh");
+    case "trail-toggle":
+      return handleTrailToggle();
     case "keepWarm":
       return handleKeepWarm();
     case "dash":
@@ -280,6 +305,27 @@ async function handleHandoffSwitch() {
 }
 
 /**
+ * Handle trail mode toggle: check current state and toggle.
+ */
+async function handleTrailToggle() {
+  try {
+    const statusJson = runJson("trail", ["status"]);
+    if (!statusJson) {
+      vscode.window.showErrorMessage("Failed to check trail status");
+      return;
+    }
+
+    const status = JSON.parse(statusJson);
+    const installed = status.installed ?? false;
+
+    const command = installed ? "warmswap trail off" : "warmswap trail on";
+    runInTerminal(command);
+  } catch {
+    vscode.window.showErrorMessage("Failed to toggle trail mode");
+  }
+}
+
+/**
  * Handle keep warm: ask for duration, run keepalive command.
  */
 async function handleKeepWarm() {
@@ -313,6 +359,27 @@ async function handleKeepWarm() {
  */
 async function handleOpenDash() {
   runInTerminal("warmswap dash");
+}
+
+/**
+ * Show an expiry toast for a project's cache approaching expiration.
+ */
+async function showExpiryToast(
+  folderName: string,
+  minutesRemaining: number
+) {
+  const message = `warmswap: cache for ${folderName} expires in ~${minutesRemaining}m`;
+  const choice = await vscode.window.showWarningMessage(
+    message,
+    "Keep warm",
+    "Dismiss"
+  );
+
+  if (choice === "Keep warm") {
+    // Show the keep warm handler
+    await handleKeepWarm();
+  }
+  // "Dismiss" does nothing; the toast is gone
 }
 
 /**

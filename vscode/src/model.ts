@@ -36,6 +36,11 @@ export interface CacheWarmthData {
 export interface AuditTotals {
   totalEvents: number;
   totalEstimatedSaved: number;
+  byClass?: {
+    switch?: { count: number; estimatedSaved: number };
+    refresh?: { count: number; estimatedSaved: number };
+    "post-reset"?: { count: number; estimatedSaved: number };
+  };
 }
 
 export interface StatusModel {
@@ -369,9 +374,23 @@ export function buildTooltipMarkdown(model: StatusModel): string {
   // Savings section from audit
   if (model.auditTotals && model.auditTotals.totalEstimatedSaved > 0) {
     lines.push("### Savings");
-    lines.push(
-      `Estimated tokens saved: **${model.auditTotals.totalEstimatedSaved}**`
-    );
+    const parts = [`**~${model.auditTotals.totalEstimatedSaved}** total`];
+    if (model.auditTotals.byClass) {
+      const classes = [];
+      if (model.auditTotals.byClass.switch?.estimatedSaved) {
+        classes.push(`switch ${model.auditTotals.byClass.switch.estimatedSaved}`);
+      }
+      if (model.auditTotals.byClass.refresh?.estimatedSaved) {
+        classes.push(`refresh ${model.auditTotals.byClass.refresh.estimatedSaved}`);
+      }
+      if (model.auditTotals.byClass["post-reset"]?.estimatedSaved) {
+        classes.push(`post-reset ${model.auditTotals.byClass["post-reset"].estimatedSaved}`);
+      }
+      if (classes.length > 0) {
+        parts.push(`(${classes.join(" · ")})`);
+      }
+    }
+    lines.push(`**Saved:** ${parts.join(" ")}`);
     lines.push("");
   }
 
@@ -409,7 +428,7 @@ export function buildTooltipMarkdown(model: StatusModel): string {
 }
 
 /**
- * Parse audit --json output and extract total savings.
+ * Parse audit --json output and extract total savings and breakdown by class.
  */
 export function parseAuditTotals(jsonStr: string): AuditTotals {
   try {
@@ -417,6 +436,7 @@ export function parseAuditTotals(jsonStr: string): AuditTotals {
     return {
       totalEvents: data.totalEvents ?? 0,
       totalEstimatedSaved: data.totalEstimatedSaved ?? 0,
+      byClass: data.byClass,
     };
   } catch {
     return { totalEvents: 0, totalEstimatedSaved: 0 };
@@ -449,6 +469,50 @@ function formatCountdown(resetAtMs: number): string {
     return `${hours}h ${minutes}m`;
   }
   return `${minutes}m`;
+}
+
+/**
+ * Determine which projects should show an expiry toast.
+ * Returns array of (folder, minutesRemaining) pairs that should toast.
+ * One toast per folder per warm-period (keyed by folder + mtime).
+ * Fires at or below threshold, not above, not twice for same key.
+ */
+export function expiryToastDecisions(
+  warmthMap: Map<string, CacheWarmthData>,
+  thresholdMinutes: number,
+  alreadyToastedKeys: Set<string>
+): Array<{ folder: string; minutesRemaining: number }> {
+  const decisions: Array<{ folder: string; minutesRemaining: number }> = [];
+
+  if (thresholdMinutes <= 0) {
+    return decisions; // Toast disabled
+  }
+
+  for (const [projectDir, warmth] of warmthMap) {
+    // Only consider warm caches with numeric remainingMinutes
+    if (typeof warmth.minutesRemaining !== "number") {
+      continue;
+    }
+
+    // Key = folder + minutesRemaining (to detect new warm period)
+    const key = `${projectDir}:${warmth.minutesRemaining}`;
+
+    // Already toasted this period? Skip.
+    if (alreadyToastedKeys.has(key)) {
+      continue;
+    }
+
+    // At or below threshold? Toast.
+    if (warmth.minutesRemaining <= thresholdMinutes) {
+      decisions.push({
+        folder: basename(projectDir),
+        minutesRemaining: warmth.minutesRemaining,
+      });
+      alreadyToastedKeys.add(key);
+    }
+  }
+
+  return decisions;
 }
 
 /**

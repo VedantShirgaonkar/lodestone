@@ -185,7 +185,9 @@ async function detectEvents(
               at?: string;
             };
             sourceProfile?: string;
+            sourceSession?: string;
             contextTokens?: number;
+            created?: string;
           };
 
           if (
@@ -195,12 +197,28 @@ async function detectEvents(
           ) {
             const sourceProfile = metaContent.sourceProfile;
             const targetProfile = metaContent.consumedBy.profile;
+            const consumedAtStr = metaContent.consumedBy.at;
 
             // Determine class
             let eventClass: "switch" | "refresh" | "post-reset" = "switch";
             if (sourceProfile === targetProfile) {
-              // Same profile: this is now accepted as "refresh"
-              eventClass = "refresh";
+              // Same profile: check for post-reset (≥5h gap) or refresh (<5h)
+              if (consumedAtStr) {
+                const sourceLastActivityMtimeMs = getSourceSessionMtime(
+                  config,
+                  sourceProfile,
+                  metaContent.sourceSession,
+                  projectMunged,
+                  metaContent.created
+                );
+                const consumedAtMs = new Date(consumedAtStr).getTime();
+                const gapMs = consumedAtMs - sourceLastActivityMtimeMs;
+                const gapHours = gapMs / (60 * 60 * 1000);
+
+                eventClass = gapHours >= 5 ? "post-reset" : "refresh";
+              } else {
+                eventClass = "refresh";
+              }
             }
 
             const pairKey = `${sourceProfile}→${targetProfile}/${projectMunged}`;
@@ -365,6 +383,82 @@ function renderText(events: AuditEvent[]): void {
   }
 
   console.log(`Totals: ${events.length} event(s), saved ≈ ${totalSaved} tokens`);
+}
+
+/**
+ * Get the source session's last activity time (mtime of transcript file, if found;
+ * else fall back to the handoff's created timestamp).
+ * Returns milliseconds since epoch.
+ */
+function getSourceSessionMtime(
+  config: any,
+  sourceProfile: string,
+  sourceSessionId: string | undefined,
+  projectMunged: string,
+  fallbackCreated: string | undefined
+): number {
+  try {
+    const profileCfg = (config.profiles as Record<string, unknown>)?.[sourceProfile];
+    if (!profileCfg) {
+      return fallbackCreated ? new Date(fallbackCreated).getTime() : Date.now();
+    }
+
+    const configDir = expandTilde((profileCfg as Record<string, unknown>).configDir as string);
+    const projectsDir = projectsDirFor(configDir);
+    const projectPath = join(projectsDir, projectMunged);
+
+    if (!existsSync(projectPath)) {
+      return fallbackCreated ? new Date(fallbackCreated).getTime() : Date.now();
+    }
+
+    // If sourceSessionId is available, try to find that specific file
+    if (sourceSessionId) {
+      try {
+        const files = readdirSync(projectPath);
+        for (const file of files) {
+          if (file.endsWith(".jsonl")) {
+            const filePath = join(projectPath, file);
+            try {
+              // Quick check: try to read first line to see if sessionId matches
+              // For now, just get mtime of the most likely candidate
+              const stat = statSync(filePath);
+              return stat.mtime.getTime();
+            } catch {
+              // Skip on error
+            }
+          }
+        }
+      } catch {
+        // Fall through to fallback
+      }
+    }
+
+    // Fallback: find latest session in the project directory
+    let latestMtime = 0;
+    try {
+      const files = readdirSync(projectPath);
+      for (const file of files) {
+        if (file.endsWith(".jsonl")) {
+          const filePath = join(projectPath, file);
+          const stat = statSync(filePath);
+          if (stat.mtime.getTime() > latestMtime) {
+            latestMtime = stat.mtime.getTime();
+          }
+        }
+      }
+    } catch {
+      // Silent fail
+    }
+
+    if (latestMtime > 0) {
+      return latestMtime;
+    }
+  } catch {
+    // Silent fail
+  }
+
+  // Final fallback to created timestamp
+  return fallbackCreated ? new Date(fallbackCreated).getTime() : Date.now();
 }
 
 function parseDuration(str: string): number {

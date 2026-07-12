@@ -18,10 +18,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   3. Auto-snapshot from transcripts (Tier 3, always available)
 - **Rehydration hooks**: Automatic handoff injection on `SessionStart` across all profiles.
 - **Switch command**: One-command account handoff: `warmswap switch <target> [--distill] [--stay]` with cost comparison printout.
-- **Advisor**: Watches usage quota, nudges `/handoff` while cache is warm (≥85% 5h window, ≥90% weekly), no blocking.
-- **Measurement**: `warmswap audit` scans profile history for handoff events and heuristic boundaries; reports per-switch cost deltas (naive vs. handoff).
+- **Advisor**: Watches usage quota, nudges `/handoff` while cache is warm (≥85% 5h window, ≥90% weekly), no blocking. At ≥95% (critical threshold), fires deterministic snapshot inline with wall-imminent message.
+- **Refresh flow**: `/refresh` skill in-session (compose handoff → instruct user to `/clear`) + `warmswap refresh` CLI for outside-session use. Handles B2 (cold cache) and B4 (voluntary shed) within the same account.
+- **Trail mode**: `warmswap trail on/off/status` installs bounded capture rules + skill that continuously maintain `.claude/handoff/trail.md` (~1.5k tokens, fixed sections overwritten in place). Optional wall insurance; cost ≈10–40k weighted/session (opt-in, documented honestly).
+- **Measurement**: `warmswap audit` scans profile history for handoff events and heuristic boundaries; reports per-switch cost deltas (naive vs. handoff). Event classes: `switch` (different profile), `refresh` (same profile, <5h gap), `post-reset` (same profile, ≥5h gap after quota boundary). Totals per class in JSON and human output.
 - **Dashboard**: `warmswap dash` live full-screen TUI (ANSI, zero deps): per-profile quota bars, live sessions with cache countdown, switch-tax panel, advisor line, keepalive status.
-- **Keepalive**: `warmswap switch <target> --keep-warm <duration>` schedules periodic TTL-refresh pings on the source profile to keep cache warm while on the target.
+- **Keepalive**: `warmswap switch <target> --keep-warm <duration>` schedules periodic TTL-refresh pings on the source profile to keep cache warm while on the target. Configurable `keepalive.maxWindowPct` ceiling (default 80): skips pings at/above that 5h window usage to preserve headroom.
 - **Real usage data**:
   - Layer A (native): Captures Claude Code's native `rate_limits` from statusline into local cache — powers advisor, dashboard, status without any API call.
   - Layer B (opt-in OAuth): `warmswap config set realUsage on` for cross-profile quota via undocumented endpoint, cached ≥180s, gracefully degrades to JSONL estimates if unavailable.
@@ -36,7 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `status [--json]`: Per-profile burn status, active sessions, current-project switch cost.
 - `dash [--once]`: Live TUI dashboard; `--once` for single frame (test/CI use).
 - `keepalive <profile> [--for <duration>] / --stop`: Standalone keepalive scheduler.
-- `audit [--since <period>] [--json]`: Analyze past handoff events and switches.
+- `audit [--since <period>] [--json]`: Analyze past handoff events and switches; per-class breakdown (switch/refresh/post-reset).
+- `trail on|off|status [--json]`: Enable/disable/check trail mode for the current project.
 - `doctor`: Diagnose setup issues (profile registry, login state, hook installation, Claude binary).
 - `init [--project] [--statusline] [--force]`: Install hooks into all profiles; optional project-level setup.
 - `config get|set`: Inspect and modify warmswap settings (plan, advisor thresholds, keepalive defaults, `realUsage` opt-in).
@@ -45,9 +48,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Automation & Hooks
 - **Hook: `session-start`** — Inject the latest handoff into a fresh session (via `SessionStart` hook).
 - **Hook: `session-end`** / **`pre-compact`** — Auto-snapshot to `auto/` slot (respects `settings.autoSnapshot`).
-- **Hook: `user-prompt-submit`** — Advisor nudge when quota threshold crossed (once per 5%-step per session).
+- **Hook: `user-prompt-submit`** — Advisor nudge when quota threshold crossed (once per 5%-step per session); at 95% critical threshold, inlines deterministic snapshot + wall-imminent message.
 - **Statusline v2** — Renders: real `rate_limits` (or estimates), pacing marker, cache-warmth countdown, advisor glyph.
 - `/handoff` skill — In-session context extraction (Tier 1); installed by `init --project`.
+- `/refresh` skill — In-session refresh flow (Tier 1 same-account): compose handoff + instruct user to `/clear`.
+- `/trail` skill — Trail mode update directive; works with `warmswap trail on` installation.
+
+#### VS Code Companion Extension
+- **Status bar item**: Shows current profile, 5h quota %, weekly quota %; click for menu.
+- **QuickPick menu**: Actions — Handoff & Switch, **Refresh In Place**, **Trail Mode: toggle**, Keep Warm, Dashboard, Refresh Status, Enable Real Usage.
+- **Popover tooltip**: Per-profile quota bars with reset countdowns; per-project cache TTL countdowns; savings totals with **per-class breakdown** (switch/refresh/post-reset); advisor warning line.
+- **Cache expiry toast**: Optional warning when a project's cache is within N minutes of expiry (configurable `warmswap.expiryToastMinutes`, default 0 = off); "Keep warm" button wires to keepalive flow.
+- **package.json contributions**: Configuration setting `warmswap.expiryToastMinutes` (number, default 0).
+- **Requirements**: warmswap CLI installed; VS Code 1.85+.
 
 #### Output & UX
 - `--json` flag for machine-readable output (status, audit, handoff metadata).
@@ -102,8 +115,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Not Included (Phase 7+)
 
-- VS Code extension (planned after CLI OSS launch)
-- npm registry publish (Phase 7, user-controlled)
+- VS Code Marketplace publish (Phase 7, pending CLI npm publish + user confirmation)
 - Blog post & launch announcement (Phase 7, with real measurement results)
 
 ---
@@ -112,7 +124,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 (Roadmap for v0.2+)
 
-- [ ] VS Code extension (statusbar + webview popover; shell out to CLI)
 - [ ] Enhanced OAuth caching (per-profile token refresh strategy)
 - [ ] Performance monitoring (profile hook execution, transcript parsing speed)
 - [ ] Community plugins API (extensible handoff format, custom extraction)

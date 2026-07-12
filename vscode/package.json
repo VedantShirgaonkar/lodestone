@@ -41,7 +41,17 @@
         "command": "warmswap.refresh",
         "title": "warmswap: Refresh Status"
       }
-    ]
+    ],
+    "configuration": {
+      "title": "warmswap",
+      "properties": {
+        "warmswap.expiryToastMinutes": {
+          "type": "number",
+          "default": 0,
+          "description": "Show a toast notification when a project's cache is about to expire (within N minutes). 0 = disabled."
+        }
+      }
+    }
   },
   "scripts": {
     "compile": "tsc -p ./",

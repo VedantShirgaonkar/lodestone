@@ -9,6 +9,7 @@ import {
   buildStatusText,
   buildTooltipMarkdown,
   parseAuditTotals,
+  expiryToastDecisions,
   StatusModel,
 } from "../src/model.js";
 import { tmpdir } from "node:os";
@@ -380,4 +381,149 @@ test("parseAuditTotals: defaults missing fields to 0", () => {
   const result = parseAuditTotals(json);
   assert.strictEqual(result.totalEvents, 0);
   assert.strictEqual(result.totalEstimatedSaved, 0);
+});
+
+/**
+ * Test: parseAuditTotals with byClass breakdown
+ */
+test("parseAuditTotals: parses byClass breakdown", () => {
+  const json = JSON.stringify({
+    events: [],
+    totalEvents: 3,
+    totalEstimatedSaved: 100000,
+    byClass: {
+      switch: { count: 1, estimatedSaved: 50000 },
+      refresh: { count: 1, estimatedSaved: 30000 },
+      "post-reset": { count: 1, estimatedSaved: 20000 },
+    },
+  });
+
+  const result = parseAuditTotals(json);
+  assert.strictEqual(result.totalEvents, 3);
+  assert.strictEqual(result.totalEstimatedSaved, 100000);
+  assert.ok(result.byClass);
+  assert.strictEqual(result.byClass.switch?.estimatedSaved, 50000);
+  assert.strictEqual(result.byClass.refresh?.estimatedSaved, 30000);
+  assert.strictEqual(result.byClass["post-reset"]?.estimatedSaved, 20000);
+});
+
+/**
+ * Test: buildTooltipMarkdown with byClass savings
+ */
+test("buildTooltipMarkdown: shows savings by class breakdown", () => {
+  const model: StatusModel = {
+    profiles: new Map(),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    auditTotals: {
+      totalEvents: 3,
+      totalEstimatedSaved: 100000,
+      byClass: {
+        switch: { count: 1, estimatedSaved: 50000 },
+        refresh: { count: 1, estimatedSaved: 30000 },
+        "post-reset": { count: 1, estimatedSaved: 20000 },
+      },
+    },
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  assert.ok(md.includes("Saved"));
+  assert.ok(md.includes("100000"));
+  assert.ok(md.includes("switch 50000"));
+  assert.ok(md.includes("refresh 30000"));
+  assert.ok(md.includes("post-reset 20000"));
+});
+
+/**
+ * Test: expiryToastDecisions fires at or below threshold
+ */
+test("expiryToastDecisions: fires at/below threshold", () => {
+  const warmthMap = new Map([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: 5 }],
+    ["/Users/test/proj2", { projectDir: "/Users/test/proj2", minutesRemaining: 10 }],
+    ["/Users/test/proj3", { projectDir: "/Users/test/proj3", minutesRemaining: 20 }],
+  ]);
+
+  const toasted = new Set<string>();
+  const decisions = expiryToastDecisions(warmthMap, 10, toasted);
+
+  // Should toast proj1 (5m <= 10m) and proj2 (10m <= 10m)
+  assert.strictEqual(decisions.length, 2);
+  assert.ok(decisions.find((d) => d.folder === "proj1"));
+  assert.ok(decisions.find((d) => d.folder === "proj2"));
+  assert.strictEqual(decisions[0].minutesRemaining, 5);
+  assert.strictEqual(decisions[1].minutesRemaining, 10);
+});
+
+/**
+ * Test: expiryToastDecisions doesn't fire above threshold
+ */
+test("expiryToastDecisions: does not fire above threshold", () => {
+  const warmthMap = new Map([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: 50 }],
+  ]);
+
+  const toasted = new Set<string>();
+  const decisions = expiryToastDecisions(warmthMap, 10, toasted);
+
+  assert.strictEqual(decisions.length, 0);
+});
+
+/**
+ * Test: expiryToastDecisions doesn't toast twice for same key
+ */
+test("expiryToastDecisions: does not toast twice for same key", () => {
+  const warmthMap = new Map([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: 5 }],
+  ]);
+
+  const toasted = new Set(["/Users/test/proj1:5"]);
+  const decisions = expiryToastDecisions(warmthMap, 10, toasted);
+
+  assert.strictEqual(decisions.length, 0);
+});
+
+/**
+ * Test: expiryToastDecisions re-fires for new warm-period key
+ */
+test("expiryToastDecisions: re-fires for new warm-period key", () => {
+  const warmthMap = new Map([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: 3 }],
+  ]);
+
+  const toasted = new Set(["/Users/test/proj1:5"]);
+  const decisions = expiryToastDecisions(warmthMap, 10, toasted);
+
+  // Different minutesRemaining = different key, so should toast
+  assert.strictEqual(decisions.length, 1);
+  assert.strictEqual(decisions[0].minutesRemaining, 3);
+});
+
+/**
+ * Test: expiryToastDecisions ignores cold caches
+ */
+test("expiryToastDecisions: ignores cold caches", () => {
+  const warmthMap = new Map<string, {projectDir: string; minutesRemaining: "cold" | number}>([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: "cold" as const }],
+  ]);
+
+  const toasted = new Set<string>();
+  const decisions = expiryToastDecisions(warmthMap as any, 10, toasted);
+
+  assert.strictEqual(decisions.length, 0);
+});
+
+/**
+ * Test: expiryToastDecisions disabled when threshold is 0
+ */
+test("expiryToastDecisions: disabled when threshold is 0", () => {
+  const warmthMap = new Map([
+    ["/Users/test/proj1", { projectDir: "/Users/test/proj1", minutesRemaining: 5 }],
+  ]);
+
+  const toasted = new Set<string>();
+  const decisions = expiryToastDecisions(warmthMap, 0, toasted);
+
+  assert.strictEqual(decisions.length, 0);
 });

@@ -119,6 +119,20 @@ Standalone: `warmswap keepalive personal --for 5m` / `--stop`.
 
 ---
 
+## Works with a single account too
+
+Even on one account, your cache expires (B2: >1 hour idle) and resets (B3: 5-hour or weekly limits). The same handoff mechanism that crosses accounts works within the account:
+
+- **B2 (cache expiry >1h):** Use `warmswap refresh` to capture a handoff, then `/clear` the bloated context. The session-start hook injects the handoff, and you resume from a clean slate at ~2k tokens instead of replaying ~150k.
+- **B3 (wall: 5h or weekly limit):** Enable `trail mode` (`warmswap trail on`) to capture continuously during a session with fixed sections (goal, state, decisions, files, next), capped at ~1.5k tokens. When the limit resets, start a fresh session and the trail loads automatically — same cheap re-entry. Cost: ≈10–40k weighted per session (one to four ordinary turns), which is insurance for the wall surprise. Trail is opt-in; documented costs up-front.
+- **Refresh in VS Code:** The companion extension adds "Refresh In Place…" to the menu, wiring `warmswap refresh` without leaving the IDE.
+
+The tool's honest scope for single-account users: **every boundary (cache expiry, wall, voluntary shed) now costs ≈2×(S+H) instead of ≈2×C**, where S is session preamble (~15–25k), H is carried state (~1–2.5k), and C is live context (~100–450k). That's the win whether you switch accounts or stay on one. Without a handoff, the first turn after a boundary replays the whole conversation.
+
+For B4 (voluntary shed with warm cache), native `/compact` is cheaper and recommended — the advisor tells you so.
+
+---
+
 ## Quickstart
 
 **Install:**
