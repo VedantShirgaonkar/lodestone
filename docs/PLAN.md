@@ -2,7 +2,7 @@
 
 Source of reference for all implementation. Read `docs/ARCHITECTURE.md` and `docs/decisions/ADR-*.md` first; research facts live in `docs/research/`. Rules for every phase: zero runtime deps (ADR-004), never touch credentials (ADR-002), hooks always exit 0, token-spending paths opt-in only (ADR-003), all estimates labeled as estimates. Phase N+1 starts only when phase N's acceptance criteria pass via `npm test`.
 
-> Status (2026-07-11): P0 ✅ · P1 ✅ (committed e5d81c7; real-transcript validated) · P2 in review loop (see docs/PHASE2-SPEC.md — binding command contracts added after first attempt shipped placeholder facades) · P3+ pending.
+> Status (2026-07-12): P0–P3 ✅ (commits 51c40e3, e5d81c7, af70b57, b7f1a91; 92 tests; dogfooded live). Direction review docs/DIRECTION.md + ADR-007..010 reshaped everything after P3 — phases 4+ below are **superseded by PLAN v2 at the end of this file**.
 
 ## Phase 0 — Scaffold ✅ (done in planning session)
 package.json / tsconfig / .gitignore / LICENSE / README stub / CLAUDE.md / .claude/settings.json / docs corpus.
@@ -77,3 +77,32 @@ Fixtures: `test/fixtures/session-small.jsonl` (hand-built: 2 user turns, 3 assis
 3. User publishes: `gh repo create` + push + `npm publish` (commands prepared, human executes — ADR-006).
 
 **Definition of done:** a stranger with two accounts can `npm i -g cchandoff`, follow the README for 5 minutes, switch accounts mid-project, and see a measured first-turn cost an order of magnitude below a naive switch — with every claim in the README backed by docs/research or their own `cchandoff audit` output.
+
+---
+
+# PLAN v2 (2026-07-12) — phases 4+ after the direction review
+
+Rules unchanged (zero deps, no placeholders, 100% green, raw-output reports, real-data acceptance). Each phase ends with my review + commit.
+
+## Phase 4 — Real usage layer + advisor (ADR-007, ADR-008 supports)
+1. `core/realUsage.ts`: (a) statusline-bridge cache — read/write `<configDir>/cchandoff/usage-cache.json` `{fetchedAt, source: "statusline"|"oauth", five_hour:{utilization,resets_at}, seven_day:{...}, seven_day_opus?, seven_day_sonnet?, extra_usage?}`; (b) opt-in OAuth fetcher per research/06 §1B (token via keychain/credentials per profile, UA `claude-code/<claude version>`, beta header, ≥180s file-locked cache, single-retry-then-degrade); (c) `getQuota(profile)` returning `{source, ...}` with estimate fallback (windowBurn) labeled.
+2. Statusline v2: prefer stdin `rate_limits` (write bridge file every render), add weekly segment, pacing marker (▲ at target%), cache-warmth countdown (`60 − idleMinutes`m), advisor glyph at threshold. Config: `settings.plan` becomes only the estimate fallback.
+3. Advisor: `hook user-prompt-submit` — reads bridge/quota, thresholds `settings.advisor {fiveHourPct: 85, weeklyPct: 90}`, emits systemMessage (+ additionalContext suggesting /handoff) once per 5%-step (state in configDir), always exit 0, <500ms. `init` wires the hook.
+4. Snapshot completeness score (0–5 across goal/state/decisions/files/next-steps) shown by snapshot/handoff/switch; "thin handoff" warning per ADR-008. Harvest `last-prompt` transcript lines as goal fallback.
+5. Factor the duplicated render-composition (snapshot.ts + hook.ts) into `core/composeHandoff.ts`.
+Acceptance: unit tests for realUsage (fixture HTTP via injectable fetcher — no live calls in CI), bridge round-trip, advisor debounce logic, composeHandoff parity (old outputs preserved byte-for-byte on fixtures); statusline child-process tests extended for rate_limits input; `cchandoff status` on this machine shows REAL five_hour/seven_day when a session ran recently (manual gate, raw output in report).
+
+## Phase 5 — dash TUI + keepalive (ADR-009, ADR-010)
+1. `cchandoff dash`: full-screen ANSI live view (2s refresh, q to quit, no deps): per-profile quota bars (real→est fallback) with resets + pacing, live sessions (project · ctx tokens · cache countdown), switch-tax panel for cwd, advisor line, keepalive status.
+2. Keepalive per ADR-009: `keepalive <profile> [--for 90m] [--max-pings 3]`, `--stop`, pidfile scheduler; `switch --keep-warm <d>` sugar; every guardrail from the ADR enforced and tested with the fake-claude bin (env-scripted).
+3. Audit command (from PLAN v1 P4): explicit handoff records via consumedBy + heuristic boundary detection; `--json`; unit-tested on two-profile fixtures.
+Acceptance: dash renders sanely at 80×24 (snapshot test of a frame with fixture data); keepalive dry-run test proves schedule+caps+cost printout; audit fixtures incl. one false-positive rejected.
+
+## Phase 6 — Evaluation + OSS polish (PLAN v1 P4 eval + P5, updated)
+EVALUATION.md + scripts/measure-switch.ts (unchanged scope) + README full rewrite (problem story → physics honesty → quickstart → advisor/dash screenshots → comparison table → FAQ incl. two-account etiquette + endpoint-volatility note), CONTRIBUTING, SECURITY (ADR-007 wording), CHANGELOG, CI (ubuntu+macos × Node 20/22 test; windows build), issue templates, npm-pack audit.
+
+## Phase 7 — Live validation + launch (user-in-the-loop)
+Real two-account run: profile add work + login; measured naive-vs-handoff switch (fills EVALUATION.md); keepalive empirical check (JSONL tier/read pattern); then user executes `gh repo create` + `npm publish`; blog/LinkedIn draft from the explainer + real numbers.
+
+## Phase 8 — VS Code extension (post-launch, ADR-010 §3)
+`vscode/` workspace: statusbar item + Quota webview (both profiles, cache countdowns, rebuild cost, action buttons shelling to CLI). Marketplace listing. Only starts after npm launch.

@@ -48,6 +48,19 @@ Take a healthy working session: ~150k tokens of context (system prompt + tools +
 
 Empirical anchor from this machine (single 489-turn session, `-Users-rahul-Desktop-Algotrace`): `input_tokens` 87,620; `cache_creation` 5,262,790 (all 1h-tier); `cache_read` 177,241,656; `output` 1,029,715. Cache reads outnumber uncached input by ~2000:1 — the cache is what makes long sessions affordable at all, and a switch forfeits it entirely.
 
+## Final verdict on cross-account cache access (re-verified 2026-07-12, "1000% check")
+
+Question: can any local tool access, transfer, warm, or otherwise manipulate one account's prompt cache from another account? **No — and it is not a gap a cleverer client could bridge.** Evidence stack:
+
+1. Anthropic's API docs, verbatim: *"Different organizations never share caches, even if they use identical prompts."* Since 2026-02-05 isolation is even finer: per-workspace within one org (API keys in different workspaces of the SAME org can't share).
+2. Anthropic's own Claude Code docs (code.claude.com/docs/en/prompt-caching): caching is server-side in whichever infrastructure serves your auth; the cache key includes org/workspace identity, model, effort level, even a fast-mode header. The client sends bytes; the server decides cache identity. There is no parameter, header, or token a client could send to reference another org's cache — the isolation IS the privacy boundary between paying customers.
+3. Empirical: fresh sessions on this machine cache-read the shared preamble within one account (org-wide prefix reuse works), while the user's observed 40–80% window burn on `/login` switches is exactly what org isolation predicts.
+4. Even within one account the cache is narrower than assumed: the system prompt embeds machine, working directory, and a git snapshot — different directories/worktrees miss each other's cache; sequential sessions share only when the git state matches; subagents run on the 5-minute tier; resuming after a version upgrade reprocesses everything.
+
+What CAN be manipulated, officially sanctioned: the TTL clock *within* an account — "each request that hits the cache resets the timer," free. That yields the switch-back keepalive (docs/research/06 §4), and it is the entire extent of legitimate "cache manipulation."
+
+Claude-Code-specific TTL facts (official page, supersedes community speculation about a "60→5m change"): subscription sessions request the **1-hour TTL automatically** (matches every transcript on this machine); it drops to 5m only while drawing on extra-usage credits; API-key auth defaults to 5m (`ENABLE_PROMPT_CACHING_1H=1` opts in); `FORCE_PROMPT_CACHING_5M=1` overrides; per-model `DISABLE_PROMPT_CACHING*` switches exist.
+
 ## Sources
 
 - https://platform.claude.com/docs/en/build-with-claude/prompt-caching (TTLs, pricing multipliers, isolation, breakpoints, minimums, invalidation table)
