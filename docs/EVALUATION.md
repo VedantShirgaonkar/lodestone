@@ -38,6 +38,14 @@ At C = 150k context, S ≈ 20k, H ≈ 1.5–2.5k:
 - n=1 user, 1 machine for the live run → claims phrased as "measured on real sessions", not universal constants; audit lets every user reproduce on their own history.
 - The undocumented usage endpoint may change → quota deltas are a secondary, not primary, metric.
 
-## Results (Phase 7 — to be filled)
+## Addendum (2026-07-13): boundary-generalization arms
+
+Two arms added by ADR-012 features, same JSONL-based measurement:
+
+- **Refresh arm (same account):** build a session to ~40k context → `/handoff` → `/clear` → continue with 5 scripted follow-ups. Measure: first post-clear turn's cache_creation+input vs the counterfactual continue-after-expiry (2×C, computed) AND vs a native `/compact` at the same point (run once for comparison; its summarization turn cost is visible in the same transcript). Report all three.
+- **Trail-mode session:** one working session with trail mode on. Measure: (a) total trail overhead = Σ output tokens of trail-update tool calls (identifiable by Write/Edit tool_use targeting trail.md) weighted, (b) trail freshness at session end (mtime vs last activity), (c) subjective continuation quality from the trail alone after a simulated wall (/clear without /handoff).
+- **Keepalive validation** unchanged (secondary metric d).
+
+## Results (Phase 11 — to be filled)
 
 _Pending live validation._
