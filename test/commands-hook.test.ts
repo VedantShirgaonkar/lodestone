@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Writable } from "node:stream";
 
-const testDir = join(tmpdir(), "cchandoff-test-hook");
+const testDir = join(tmpdir(), "warmswap-test-hook");
 
 test.before(() => {
   if (existsSync(testDir)) {

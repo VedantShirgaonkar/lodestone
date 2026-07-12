@@ -28,14 +28,14 @@ export function handoffDirFor(projectRoot: string): string {
 }
 
 /**
- * Get the cchandoff config path.
- * $XDG_CONFIG_HOME/cchandoff/config.json, fallback to ~/.config/cchandoff/config.json
+ * Get the warmswap config path.
+ * $XDG_CONFIG_HOME/warmswap/config.json, fallback to ~/.config/warmswap/config.json
  */
-export function cchandoffConfigPath(): string {
+export function warmswapConfigPath(): string {
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
   const configDir = xdgConfigHome
-    ? join(xdgConfigHome, "cchandoff")
-    : join(homedir(), ".config", "cchandoff");
+    ? join(xdgConfigHome, "warmswap")
+    : join(homedir(), ".config", "warmswap");
   return join(configDir, "config.json");
 }
 

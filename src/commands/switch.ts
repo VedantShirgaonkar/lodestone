@@ -47,7 +47,7 @@ export async function switchCmd(
     const targetProfileName = positionals[0] as string | undefined;
 
     if (!targetProfileName) {
-      console.error("cchandoff switch: missing target profile name");
+      console.error("warmswap switch: missing target profile name");
       return 2;
     }
 
@@ -55,10 +55,10 @@ export async function switchCmd(
     const currentProfileInfo = resolveActingProfile(opts.profile);
     if (!currentProfileInfo) {
       if (opts.profile) {
-        console.error(`cchandoff switch: profile not found: ${opts.profile}`);
+        console.error(`warmswap switch: profile not found: ${opts.profile}`);
       } else {
         console.error(
-          `cchandoff switch: no profiles registered — run: cchandoff profile add <name>`
+          `warmswap switch: no profiles registered — run: warmswap profile add <name>`
         );
       }
       return 1;
@@ -69,7 +69,7 @@ export async function switchCmd(
     const targetProfileCfg = config.profiles[targetProfileName];
     if (!targetProfileCfg) {
       console.error(
-        `cchandoff switch: profile not found: ${targetProfileName}`
+        `warmswap switch: profile not found: ${targetProfileName}`
       );
       return 1;
     }
@@ -77,7 +77,7 @@ export async function switchCmd(
     // Check that target differs from current
     if (currentProfileInfo.name === targetProfileName) {
       console.error(
-        `cchandoff switch: target profile is the same as current (${targetProfileName})`
+        `warmswap switch: target profile is the same as current (${targetProfileName})`
       );
       return 1;
     }
@@ -165,7 +165,7 @@ export async function switchCmd(
       if (!opts.json) {
         console.log();
         console.log(
-          "tip: run `cchandoff init` once and the new session picks this up automatically"
+          "tip: run `warmswap init` once and the new session picks this up automatically"
         );
       }
 
@@ -214,7 +214,7 @@ export async function switchCmd(
     return exitCode;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff switch: ${msg}`);
+    console.error(`warmswap switch: ${msg}`);
     return 1;
   }
 }

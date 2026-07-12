@@ -4,7 +4,7 @@ import { loadConfig, saveConfig } from "../src/core/config.js";
 import { mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-const testDir = join(tmpdir(), "cchandoff-test-config");
+const testDir = join(tmpdir(), "warmswap-test-config");
 test.before(() => {
     if (existsSync(testDir)) {
         rmSync(testDir, { recursive: true });

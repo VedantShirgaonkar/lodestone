@@ -98,10 +98,10 @@ export async function handoff(
     const profileInfo = resolveActingProfile(opts.profile);
     if (!profileInfo) {
       if (opts.profile) {
-        console.error(`cchandoff handoff: profile not found: ${opts.profile}`);
+        console.error(`warmswap handoff: profile not found: ${opts.profile}`);
       } else {
         console.error(
-          `cchandoff handoff: no profiles registered — run: cchandoff profile add <name>`
+          `warmswap handoff: no profiles registered — run: warmswap profile add <name>`
         );
       }
       return 1;
@@ -110,7 +110,7 @@ export async function handoff(
     const projectRoot = findProjectRoot(process.cwd());
     const handoffData = loadLatestHandoff(projectRoot);
     if (!handoffData) {
-      console.error("cchandoff handoff: failed to load handoff file");
+      console.error("warmswap handoff: failed to load handoff file");
       return 1;
     }
 
@@ -243,7 +243,7 @@ Output ONLY the rewritten sections in this format:
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff handoff: ${msg}`);
+    console.error(`warmswap handoff: ${msg}`);
     return 1;
   }
 }

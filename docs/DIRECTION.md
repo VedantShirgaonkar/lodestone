@@ -12,7 +12,7 @@ Half-agreed, and the design now reflects it (ADR-008): deterministic extraction 
 
 ## Q3 — Open-source shape + monitoring UI
 
-Product = npm CLI (`cchandoff`) as the single source of truth; surfaces: statusline v2 (real `rate_limits`, pacing marker, cache countdown, advisor glyph) + `cchandoff dash` live TUI (the reference popover, terminal-native, both profiles) now; slim VS Code extension (statusbar + Quota popover + action buttons) after launch (ADR-010). Real data policy per ADR-007 — native statusline feed needs no credentials; the cross-profile view is the opt-in OAuth-endpoint layer. The UI answers, at a glance: both accounts' 5h/weekly bars with resets and pacing · minutes left on each live session's 1h cache · what a full/partial rebuild costs *for your plan right now* · when to hand off.
+Product = npm CLI (`warmswap`) as the single source of truth; surfaces: statusline v2 (real `rate_limits`, pacing marker, cache countdown, advisor glyph) + `warmswap dash` live TUI (the reference popover, terminal-native, both profiles) now; slim VS Code extension (statusbar + Quota popover + action buttons) after launch (ADR-010). Real data policy per ADR-007 — native statusline feed needs no credentials; the cross-profile view is the opt-in OAuth-endpoint layer. The UI answers, at a glance: both accounts' 5h/weekly bars with resets and pacing · minutes left on each live session's 1h cache · what a full/partial rebuild costs *for your plan right now* · when to hand off.
 
 ## Q4 — Conference paper or LinkedIn post?
 

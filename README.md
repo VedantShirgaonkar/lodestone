@@ -1,4 +1,4 @@
-# cchandoff
+# warmswap
 
 > Switch Claude Code accounts without torching your usage limits: isolated per-account profiles + automated context handoffs, measured.
 
@@ -22,18 +22,18 @@ When you switch accounts mid-session (via `/login` or by picking another account
 
 **Preserve the prompt cache across accounts.** Caches are keyed at the organization level and enforced server-side. Switching accounts means a cache miss, always. See [docs/research/01 final verdict](docs/research/01-prompt-caching.md#final-verdict-on-cross-account-cache-access-re-verified-2026-07-12-1000-check) for the full technical audit. 
 
-What cchandoff *does* do: **minimize what must cross the boundary** — replace a ~150k-token conversation replay with a ~2k-token structured handoff.
+What warmswap *does* do: **minimize what must cross the boundary** — replace a ~150k-token conversation replay with a ~2k-token structured handoff.
 
 ---
 
-## What cchandoff does
+## What warmswap does
 
 ### **Profiles** — isolated accounts
 One `CLAUDE_CONFIG_DIR` per account. Your existing `~/.claude` is adopted untouched as `personal`. Create more:
 
 ```bash
-cchandoff profile add work
-cchandoff login work
+warmswap profile add work
+warmswap login work
 ```
 
 Profiles are fully isolated: auth, settings, session history, all independent.
@@ -43,7 +43,7 @@ Three tiers (user follows the recommended path via the advisor):
 
 1. **Tier 1 (recommended): `/handoff` skill in-session** — write a handoff from live conversation knowledge, to `.claude/handoff/latest.md`. Zero extra cost; runs against a warm cache. The advisor nudges this while the session is alive (see below).
 
-2. **Tier 2: `cchandoff handoff --distill`** — after leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
+2. **Tier 2: `warmswap handoff --distill`** — after leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
 
 3. **Tier 3 (floor, always on): Auto-snapshot** — deterministic extraction from transcripts (goal, recent prompts, files, todos, git state, last response) saved by `SessionEnd` and `PreCompact` hooks. Always there, free, no LLM required.
 
@@ -62,7 +62,7 @@ The receiving Claude verifies against the live tree and continues. At ~2k tokens
 
 ### **Switch workflow** — account handoff in one command
 ```bash
-cchandoff switch work
+warmswap switch work
 ```
 
 This orchestrates: snapshot current session → distill (if desired) → launch Claude under the target account's `CLAUDE_CONFIG_DIR` in the same directory, where the SessionStart hook injects the handoff. It prints a measured cost comparison first — see the [feature tour](#feature-tour--real-captured-output) for real captured output (96% less on a real 450k-token session).
@@ -71,15 +71,15 @@ This orchestrates: snapshot current session → distill (if desired) → launch 
 Watches your real usage quota (real data from Claude Code's statusline or opt-in OAuth endpoint). At ≥85% of 5-hour window (or ≥90% weekly), emits a nudge:
 
 ```
-⚠ cchandoff: 5-hour window at 87% — cache is warm.
-  Use /handoff in-session (free), then: cchandoff switch work
+⚠ warmswap: 5-hour window at 87% — cache is warm.
+  Use /handoff in-session (free), then: warmswap switch work
 ```
 
 Shows once per 5%-step per session. Never blocks.
 
 ### **Measure** — see what your past switches actually cost
 ```bash
-cchandoff audit
+warmswap audit
 ```
 
 Scans your profile history for explicit handoff events (via `consumedBy` metadata) and heuristic boundaries (same project, A→B within 30 min). Reports per event:
@@ -95,7 +95,7 @@ Session A → B (2026-07-12 14:22)
 
 ### **Dashboard** — live profile & session view
 ```bash
-cchandoff dash
+warmswap dash
 ```
 
 Full-screen ANSI TUI (q to quit, 2s refresh):
@@ -104,18 +104,18 @@ Full-screen ANSI TUI (q to quit, 2s refresh):
 - Switch-tax panel: naive vs. handoff cost for the current project
 - Advisor line: nudge state and keepalive status
 
-`cchandoff dash --once` for a single frame (test/CI use).
+`warmswap dash --once` for a single frame (test/CI use).
 
 ### **Keepalive** — warm cache on switch-back
 When switching to account B intending to return to A, the cache on A dies after 1 hour idle. A periodic "ping" on A (via `--resume --fork-session --max-turns 1`) costs ~0.1×C weighted and refreshes the TTL:
 
 ```bash
-cchandoff switch work --keep-warm 90m
+warmswap switch work --keep-warm 90m
 ```
 
 Schedules 3 pings (default, configurable) at 52-minute intervals over 90 minutes. Each ping prints its cost before running. Skipped if A's 5-hour window ≥80% (guardrail: don't burn tokens).
 
-Standalone: `cchandoff keepalive personal --for 5m` / `--stop`.
+Standalone: `warmswap keepalive personal --for 5m` / `--stop`.
 
 ---
 
@@ -123,38 +123,38 @@ Standalone: `cchandoff keepalive personal --for 5m` / `--stop`.
 
 **Install:**
 ```bash
-npm install -g cchandoff
+npm install -g warmswap
 ```
 
 Or use via `npx`:
 ```bash
-npx cchandoff --help
+npx warmswap --help
 ```
 
 **One-time setup:**
 ```bash
 # Add your two accounts
-cchandoff profile add work  # default: ~/.claude-profiles/work
-cchandoff login work
+warmswap profile add work  # default: ~/.claude-profiles/work
+warmswap login work
 
 # Install hooks into all profiles
-cchandoff init
+warmswap init
 
 # (optional) Enable real usage data from Anthropic endpoint
-cchandoff config set realUsage on
+warmswap config set realUsage on
 ```
 
 **Daily flow:**
 1. Work on `personal` (or `work`)
-2. When the session is alive and you want to switch: type `/handoff` (Tier 1, recommended) or run `cchandoff handoff --distill` (Tier 2)
-3. Run `cchandoff switch work`
+2. When the session is alive and you want to switch: type `/handoff` (Tier 1, recommended) or run `warmswap handoff --distill` (Tier 2)
+3. Run `warmswap switch work`
 4. Claude on `work` sees the handoff and continues
 
 **Check status anytime:**
 ```bash
-cchandoff status        # per-profile burn, active sessions, switch cost
-cchandoff dash          # live TUI (or --once for one frame)
-cchandoff doctor        # diagnose setup
+warmswap status        # per-profile burn, active sessions, switch cost
+warmswap dash          # live TUI (or --once for one frame)
+warmswap doctor        # diagnose setup
 ```
 
 ---
@@ -163,7 +163,7 @@ cchandoff doctor        # diagnose setup
 
 Everything below was captured verbatim from a real machine during development (a ~450k-token working session on the 1M-context model). Your numbers will differ; the shapes won't.
 
-### `cchandoff switch work --stay`
+### `warmswap switch work --stay`
 ```
 handoff ready: .claude/handoff/latest.md (~810 tokens)
 
@@ -173,7 +173,7 @@ switching personal → work in /Users/rahul/Desktop/mem
 (estimates; cache writes are billed 2× — see docs/explainer)
 ```
 
-### `cchandoff status`
+### `warmswap status`
 ```
 personal  /Users/rahul/.claude      you@example.com (Your Organization)
   5h window: [█████████████░░░░░░░░░] 60% est
@@ -186,18 +186,18 @@ switch tax now: ≈ 911,940 weighted tokens naive vs ≈ 42,408 with handoff
 
 ### Statusline (in Claude Code, with real quota data)
 ```
-⇄ personal · ctx 42% · 5h 87%▲87 (2h10m) · wk 25% ⚠ handoff?
+⇄ personal · ctx 42% · cache 43m · 5h 87%▲87 (2h10m) · wk 25% ⚠ handoff?
 ```
-`▲87` is the pacing target (where linear consumption "should" be), `(2h10m)` the reset countdown, `⚠ handoff?` the advisor at threshold.
+`cache 43m` is the session cache TTL (minutes until cold), `▲87` is the pacing target (where linear consumption "should" be), `(2h10m)` the reset countdown, `⚠ handoff?` the advisor at threshold.
 
 ### Advisor (UserPromptSubmit hook — shown by Claude Code as a system message)
 ```json
-{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)"},"systemMessage":"cchandoff: 5h window at 87% — cache is warm: /handoff now is cheap, then cchandoff switch <other>"}
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)"},"systemMessage":"warmswap: 5h window at 87% — cache is warm: /handoff now is cheap, then warmswap switch <other>"}
 ```
 
-### `cchandoff dash --once`
+### `warmswap dash --once`
 ```
-cchandoff dash · 11:30:49 · q quit · r refresh
+warmswap dash · 11:30:49 · q quit · r refresh
 
 personal · you@example.com (Your Organization)
   5h [███████████████] 100% 207% · resets in 2h 57m · (est, target 41%)
@@ -221,7 +221,7 @@ Keepalive plan for personal:
 Keepalive started (pid 11019)
 ```
 
-### `cchandoff audit`
+### `warmswap audit`
 On a machine that has never switched profiles yet it honestly reports `No switch events found`; after your first handoff switches it lists each event with context abandoned, actual first-turn cache writes on the target, and the naive-vs-handoff comparison (see `--json` for the schema).
 
 ---
@@ -247,12 +247,12 @@ Full explainer: [docs/explainer/how-claude-code-memory-works.md](docs/explainer/
 ## Real usage data — two layers
 
 ### Layer A: In-session (native, always available)
-Claude Code natively passes `rate_limits` (real quota %) into statusline on every render. Our statusline captures it to `~/.config/cchandoff/usage-cache.json` so hooks and status can read it without any API call. The advisor uses this.
+Claude Code natively passes `rate_limits` (real quota %) into statusline on every render. Our statusline captures it to `~/.config/warmswap/usage-cache.json` so hooks and status can read it without any API call. The advisor uses this.
 
 ### Layer B: Cross-profile (opt-in OAuth)
 For checking the other account's quota when it's not running a session:
 ```bash
-cchandoff config set realUsage on
+warmswap config set realUsage on
 ```
 
 Uses the OAuth access token from your OS keychain (macOS) or credentials.json (Linux). Token is never stored, copied, or sent anywhere except `api.anthropic.com` over TLS. Responses cached ≥180s. Falls back to JSONL estimation if unavailable or 429-limited.
@@ -271,7 +271,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 - Default: 3 pings (works up to ~3h away)
 
 **Guardrails:**
-- Never enabled by default — always explicit: `cchandoff switch work --keep-warm 90m`
+- Never enabled by default — always explicit: `warmswap switch work --keep-warm 90m`
 - Skips if source profile's 5h ≥80% (don't waste quota near the limit)
 - Each ping prints cost before running
 - `--no-session-persistence` supported (verify empirically in your EVALUATION run)
@@ -280,9 +280,9 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 
 ---
 
-## Comparison: cchandoff vs. alternatives
+## Comparison: warmswap vs. alternatives
 
-| Tool | What it does | What cchandoff adds |
+| Tool | What it does | What warmswap adds |
 |---|---|---|
 | **ccusage** (community) | Analytics dashboard on transcripts | Multi-account, handoff workflow, switch advisor |
 | **Claude Code statusline** (native) | Shows usage %, recent sessions | Cross-profile view, cache TTL countdown, switch cost est. |
@@ -291,7 +291,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 | **Quota VS Code extensions** (10+ in marketplace) | Terminal/editor usage bar | Profiles, cache countdown, switch cost, handoff actions |
 | **Multi-account setups** (manual) | Two `CLAUDE_CONFIG_DIR` env shortcuts | Hooks, handoff, automation, measurement |
 
-**Unique to cchandoff:**
+**Unique to warmswap:**
 - Automated, advisor-driven handoff workflow (Tier 1 nudge → Tier 2 distill → Tier 3 fallback)
 - Real quota data (in-session + cross-profile opt-in) feeding advisor & dashboard
 - Switch-cost measurement & audit trail
@@ -303,7 +303,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 ## FAQ
 
 ### **Do I need two paid subscriptions?**
-Yes, both accounts must have their own Pro/Max/Team plan. Organization policies on account sharing are your responsibility to check with your admin. cchandoff is a tool for multiplexing your own accounts; it doesn't share credentials.
+Yes, both accounts must have their own Pro/Max/Team plan. Organization policies on account sharing are your responsibility to check with your admin. warmswap is a tool for multiplexing your own accounts; it doesn't share credentials.
 
 ### **Windows support?**
 Best-effort. Built and tested on macOS; Linux works (Keychain replaced by credentials.json). Windows users: Credentials.json path works identically. Hooks should work in PowerShell and WSL. File paths use `\` on native Windows; munging to `-` for project dirs is applied. Report issues with concrete examples.
@@ -329,9 +329,9 @@ Safest stance: test on a non-critical account first.
 Yes, within one account. TTL refresh (hitting the cache to reset the 1h clock) is free. We use this in the keepalive feature. But **TTL is per-account** — switching accounts means cache miss, and there's nothing a client-side tool can do about that. See [research/01](docs/research/01-prompt-caching.md).
 
 ### **How do I know it actually works?**
-`cchandoff audit` shows your past switches + cost deltas. `cchandoff status` and `dash` show live metrics. The handoff files themselves (`.claude/handoff/latest.md` and archived versions) are human-readable. We include an evaluation methodology in [EVALUATION.md](docs/EVALUATION.md).
+`warmswap audit` shows your past switches + cost deltas. `warmswap status` and `dash` show live metrics. The handoff files themselves (`.claude/handoff/latest.md` and archived versions) are human-readable. We include an evaluation methodology in [EVALUATION.md](docs/EVALUATION.md).
 
-### **Cost of running cchandoff itself?**
+### **Cost of running warmswap itself?**
 Zero token cost for the CLI (no API calls except opt-in real-usage endpoint, cached). Hooks run in <2s and exit 0 on failure (logged, never visible). The only token spend is `/handoff` (Tier 1, lives in the session) or `--distill` (Tier 2, optional).
 
 ---
@@ -340,13 +340,13 @@ Zero token cost for the CLI (no API calls except opt-in real-usage endpoint, cac
 
 **Install from npm (when published):**
 ```bash
-npm install -g cchandoff
+npm install -g warmswap
 ```
 
 **Dev setup:**
 ```bash
-git clone https://github.com/OWNER/cchandoff   # OWNER: replaced at publish time
-cd cchandoff
+git clone https://github.com/OWNER/warmswap   # OWNER: replaced at publish time
+cd warmswap
 npm ci
 npm run build
 npm test
@@ -363,7 +363,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development details and fixture priva
 
 ## Support & reporting issues
 
-**Bug reports:** Run `cchandoff doctor` and include its output.
+**Bug reports:** Run `warmswap doctor` and include its output.
 
 **Security issues:** See [SECURITY.md](SECURITY.md) for responsible disclosure.
 

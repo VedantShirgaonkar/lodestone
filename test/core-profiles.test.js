@@ -4,7 +4,7 @@ import { addProfile, removeProfile, currentProfile, loggedInHint, } from "../src
 import { mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-const testDir = join(tmpdir(), "cchandoff-test-profiles");
+const testDir = join(tmpdir(), "warmswap-test-profiles");
 const configDir = join(testDir, "config");
 test.before(() => {
     if (existsSync(testDir)) {

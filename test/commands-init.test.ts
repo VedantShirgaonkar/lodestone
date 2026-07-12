@@ -5,9 +5,9 @@ import { writeFileSync, mkdirSync, rmSync, existsSync, readFileSync } from "node
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { loadConfig, saveConfig } from "../src/core/config.js";
-import { cchandoffConfigPath } from "../src/core/paths.js";
+import { warmswapConfigPath } from "../src/core/paths.js";
 
-const testDir = join(tmpdir(), "cchandoff-test-init");
+const testDir = join(tmpdir(), "warmswap-test-init");
 
 test.before(() => {
   if (existsSync(testDir)) {
@@ -57,9 +57,9 @@ test("init: user-level installs hooks into all profiles", async () => {
   }) as typeof console.log;
 
   // Use environment variable to point to test config
-  process.env.CCHANDOFF_HOOK_CMD = "test-hook";
+  process.env.WARMSWAP_HOOK_CMD = "test-hook";
   const result = await init([], { json: false });
-  delete process.env.CCHANDOFF_HOOK_CMD;
+  delete process.env.WARMSWAP_HOOK_CMD;
 
   console.log = originalLog;
 
@@ -81,9 +81,9 @@ test("init: project-level creates .claude/settings.json", async () => {
     capturedOutput.push(msg);
   }) as typeof console.log;
 
-  process.env.CCHANDOFF_HOOK_CMD = "test-hook";
+  process.env.WARMSWAP_HOOK_CMD = "test-hook";
   const result = await init(["--project"], { json: false });
-  delete process.env.CCHANDOFF_HOOK_CMD;
+  delete process.env.WARMSWAP_HOOK_CMD;
 
   console.log = originalLog;
   process.cwd = originalCwd;
@@ -109,9 +109,9 @@ test("init: project-level adds to .gitignore", async () => {
     capturedOutput.push(msg);
   }) as typeof console.log;
 
-  process.env.CCHANDOFF_HOOK_CMD = "test-hook";
+  process.env.WARMSWAP_HOOK_CMD = "test-hook";
   const result = await init(["--project"], { json: false });
-  delete process.env.CCHANDOFF_HOOK_CMD;
+  delete process.env.WARMSWAP_HOOK_CMD;
 
   console.log = originalLog;
   process.cwd = originalCwd;
@@ -137,9 +137,9 @@ test("init: project-level --statusline sets statusline command", async () => {
     capturedOutput.push(msg);
   }) as typeof console.log;
 
-  process.env.CCHANDOFF_HOOK_CMD = "test-hook";
+  process.env.WARMSWAP_HOOK_CMD = "test-hook";
   const result = await init(["--project", "--statusline"], { json: false });
-  delete process.env.CCHANDOFF_HOOK_CMD;
+  delete process.env.WARMSWAP_HOOK_CMD;
 
   console.log = originalLog;
   process.cwd = originalCwd;
@@ -149,7 +149,7 @@ test("init: project-level --statusline sets statusline command", async () => {
   if (existsSync(settingsPath)) {
     const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
     assert.ok(settings.statusLine);
-    assert.equal(settings.statusLine.command, "cchandoff statusline");
+    assert.equal(settings.statusLine.command, "warmswap statusline");
   }
 });
 
@@ -160,7 +160,7 @@ test("init: is idempotent", async () => {
   const originalCwd = process.cwd;
   process.cwd = () => projectDir;
 
-  process.env.CCHANDOFF_HOOK_CMD = "test-hook";
+  process.env.WARMSWAP_HOOK_CMD = "test-hook";
 
   // First run
   const result1 = await init(["--project"], { json: false });
@@ -168,7 +168,7 @@ test("init: is idempotent", async () => {
   // Second run should produce identical results
   const result2 = await init(["--project"], { json: false });
 
-  delete process.env.CCHANDOFF_HOOK_CMD;
+  delete process.env.WARMSWAP_HOOK_CMD;
   process.cwd = originalCwd;
 
   // Both should succeed

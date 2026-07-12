@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "..", "..", "bin/cchandoff.js");
-const testDir = resolve(tmpdir(), `cchandoff-test-dash-${Date.now()}`);
+const CLI = resolve(__testDir, "..", "..", "bin/warmswap.js");
+const testDir = resolve(tmpdir(), `warmswap-test-dash-${Date.now()}`);
 
 function runDash(
   env: Record<string, string>
@@ -34,10 +34,10 @@ function runDash(
 test("dash --once: renders frame with profile name and quota bars", async () => {
   const testHome = resolve(testDir, "home1");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -52,7 +52,7 @@ test("dash --once: renders frame with profile name and quota bars", async () => 
   });
 
   assert.equal(code, 0, "should exit 0");
-  assert.match(stdout, /cchandoff dash/, "should show header");
+  assert.match(stdout, /warmswap dash/, "should show header");
   assert.match(stdout, /personal/, "should show profile name");
   assert.match(stdout, /5h/, "should show 5h label");
   assert.match(stdout, /wk/, "should show weekly label");
@@ -65,10 +65,10 @@ test("dash --once: renders frame with profile name and quota bars", async () => 
 test("dash --once: NO_COLOR strips ANSI codes", async () => {
   const testHome = resolve(testDir, "home2");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -96,11 +96,11 @@ test("dash --once: renders multiple profiles", async () => {
   const testHome = resolve(testDir, "home3");
   const personalDir = resolve(testHome, ".claude");
   const workDir = resolve(testHome, ".claude-work");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(personalDir, { recursive: true });
   await mkdir(workDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: {

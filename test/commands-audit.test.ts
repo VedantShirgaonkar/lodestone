@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "..", "..", "bin/cchandoff.js");
-const testDir = resolve(tmpdir(), `cchandoff-test-audit-${Date.now()}`);
+const CLI = resolve(__testDir, "..", "..", "bin/warmswap.js");
+const testDir = resolve(tmpdir(), `warmswap-test-audit-${Date.now()}`);
 const FIXTURE_SESSION = resolve(__testDir, "fixtures", "session-small.jsonl");
 
 function runAudit(
@@ -36,10 +36,10 @@ function runAudit(
 test("audit: shows no events when no sessions exist", async () => {
   const testHome = resolve(testDir, "home1");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -60,10 +60,10 @@ test("audit: shows no events when no sessions exist", async () => {
 test("audit: accepts --since flag", async () => {
   const testHome = resolve(testDir, "home2");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -87,10 +87,10 @@ test("audit: accepts --since flag", async () => {
 test("audit: accepts --json flag", async () => {
   const testHome = resolve(testDir, "home3");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -119,10 +119,10 @@ test("audit: accepts --json flag", async () => {
 test("audit: handles invalid --since", async () => {
   const testHome = resolve(testDir, "home4");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -148,10 +148,10 @@ test("audit: parseDuration rejects invalid formats", async () => {
   // The audit command will error on invalid --since values
   const testHome = resolve(testDir, "home5");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },

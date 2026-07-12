@@ -14,17 +14,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Profiles**: Isolated per-account configuration via `CLAUDE_CONFIG_DIR` environment variable. Auto-adopt existing `~/.claude` as `personal`.
 - **Handoff workflow**: Three-tier quality ladder:
   1. In-session `/handoff` skill (Tier 1, recommended)
-  2. `cchandoff handoff --distill` (Tier 2, cold-cache guard)
+  2. `warmswap handoff --distill` (Tier 2, cold-cache guard)
   3. Auto-snapshot from transcripts (Tier 3, always available)
 - **Rehydration hooks**: Automatic handoff injection on `SessionStart` across all profiles.
-- **Switch command**: One-command account handoff: `cchandoff switch <target> [--distill] [--stay]` with cost comparison printout.
+- **Switch command**: One-command account handoff: `warmswap switch <target> [--distill] [--stay]` with cost comparison printout.
 - **Advisor**: Watches usage quota, nudges `/handoff` while cache is warm (≥85% 5h window, ≥90% weekly), no blocking.
-- **Measurement**: `cchandoff audit` scans profile history for handoff events and heuristic boundaries; reports per-switch cost deltas (naive vs. handoff).
-- **Dashboard**: `cchandoff dash` live full-screen TUI (ANSI, zero deps): per-profile quota bars, live sessions with cache countdown, switch-tax panel, advisor line, keepalive status.
-- **Keepalive**: `cchandoff switch <target> --keep-warm <duration>` schedules periodic TTL-refresh pings on the source profile to keep cache warm while on the target.
+- **Measurement**: `warmswap audit` scans profile history for handoff events and heuristic boundaries; reports per-switch cost deltas (naive vs. handoff).
+- **Dashboard**: `warmswap dash` live full-screen TUI (ANSI, zero deps): per-profile quota bars, live sessions with cache countdown, switch-tax panel, advisor line, keepalive status.
+- **Keepalive**: `warmswap switch <target> --keep-warm <duration>` schedules periodic TTL-refresh pings on the source profile to keep cache warm while on the target.
 - **Real usage data**:
   - Layer A (native): Captures Claude Code's native `rate_limits` from statusline into local cache — powers advisor, dashboard, status without any API call.
-  - Layer B (opt-in OAuth): `cchandoff config set realUsage on` for cross-profile quota via undocumented endpoint, cached ≥180s, gracefully degrades to JSONL estimates if unavailable.
+  - Layer B (opt-in OAuth): `warmswap config set realUsage on` for cross-profile quota via undocumented endpoint, cached ≥180s, gracefully degrades to JSONL estimates if unavailable.
 
 #### Commands
 - `profile add|list|remove|rename|adopt`: Manage profiles, auto-adopt `~/.claude` on first run.
@@ -39,7 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `audit [--since <period>] [--json]`: Analyze past handoff events and switches.
 - `doctor`: Diagnose setup issues (profile registry, login state, hook installation, Claude binary).
 - `init [--project] [--statusline] [--force]`: Install hooks into all profiles; optional project-level setup.
-- `config get|set`: Inspect and modify cchandoff settings (plan, advisor thresholds, keepalive defaults, `realUsage` opt-in).
+- `config get|set`: Inspect and modify warmswap settings (plan, advisor thresholds, keepalive defaults, `realUsage` opt-in).
 - `help`: Show command help; `<command> --help` for subcommand help.
 
 #### Automation & Hooks
@@ -56,9 +56,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - "Thin handoff" warning when deterministic extraction scores low.
 
 #### Configuration
-- `~/.config/cchandoff/config.json`: Profile registry, settings (plan, advisor thresholds, autoSnapshot, distillModel, realUsage opt-in).
+- `~/.config/warmswap/config.json`: Profile registry, settings (plan, advisor thresholds, autoSnapshot, distillModel, realUsage opt-in).
 - Per-profile settings via `settings.json` (hooks, custom models, etc.).
-- Hook self-test: `cchandoff hook session-start --self-test`.
+- Hook self-test: `warmswap hook session-start --self-test`.
 
 #### Documentation
 - **README.md**: Problem story, feature tour, quickstart, how-it-works, comparison table, FAQ.
@@ -77,7 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Testing
 - **128 tests** across unit (core logic, extraction, hooks) and integration (CLI commands, fixture transcripts).
 - Test fixtures: synthetic JSONL transcripts (small, compact-summary, sidechain variants), settings configs.
-- Child-process tests: `CCHANDOFF_CLAUDE_BIN` env var for fake-claude.sh (scripted responses, no real API).
+- Child-process tests: `WARMSWAP_CLAUDE_BIN` env var for fake-claude.sh (scripted responses, no real API).
 - Zero-dep verification: `npm ls --production` in CI.
 
 #### CI/CD
@@ -88,7 +88,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Package & Distribution
 - **package.json**: Zero runtime dependencies (dev: typescript, @types/node).
 - **Keywords**: claude, claude-code, handoff, context, usage-limits, prompt-cache, multi-account, cli.
-- **Bin**: `cchandoff` and `cch` (alias).
+- **Bin**: `warmswap` and `cch` (alias).
 - **Files field**: bin, dist, skills, README.md, LICENSE (verified via `npm pack --dry-run`).
 - **Repository**: Placeholder GitHub URL (to be filled on publish per TODO comment).
 

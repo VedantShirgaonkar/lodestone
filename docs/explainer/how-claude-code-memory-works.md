@@ -66,4 +66,4 @@ Context C on account A; fixed session preamble S (~15–25k); handoff H (~2k):
 | Resume same session on B later | ≈ C × 2 | ~300k |
 | **Fresh session on B + handoff** | ≈ (S+H) × 2 | ~35–45k |
 
-Plus the compounding effect: the naive path drags C into every later turn on B; the handoff path starts a lean session. That's the entire thesis of cchandoff — and the same mechanism rescues single-account users resuming cold sessions.
+Plus the compounding effect: the naive path drags C into every later turn on B; the handoff path starts a lean session. That's the entire thesis of warmswap — and the same mechanism rescues single-account users resuming cold sessions.

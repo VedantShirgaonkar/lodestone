@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "../..", "bin/cchandoff.js");
-const testDir = resolve(tmpdir(), `cchandoff-test-config-${Date.now()}`);
+const CLI = resolve(__testDir, "../..", "bin/warmswap.js");
+const testDir = resolve(tmpdir(), `warmswap-test-config-${Date.now()}`);
 
 function runConfig(
   args: string[],
@@ -34,7 +34,7 @@ function runConfig(
 
 test("config: get realUsage defaults to false", async () => {
   const testHome = resolve(testDir, "home1");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
 
   const { stdout, code } = await runConfig(["get", "realUsage"], {
     HOME: testHome,
@@ -49,9 +49,9 @@ test("config: get realUsage defaults to false", async () => {
 
 test("config: set realUsage to true", async () => {
   const testHome = resolve(testDir, "home2");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: {},
@@ -69,7 +69,7 @@ test("config: set realUsage to true", async () => {
 
   // Verify it was actually set
   const configRaw = await readFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     "utf8"
   );
   const config = JSON.parse(configRaw);
@@ -80,7 +80,7 @@ test("config: set realUsage to true", async () => {
 
 test("config: get advisor thresholds with defaults", async () => {
   const testHome = resolve(testDir, "home3");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
 
   const { stdout: stdout5h, code: code5h } = await runConfig(
     ["get", "advisor.fiveHourPct"],
@@ -109,9 +109,9 @@ test("config: get advisor thresholds with defaults", async () => {
 
 test("config: set advisor thresholds", async () => {
   const testHome = resolve(testDir, "home4");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: {},
@@ -132,7 +132,7 @@ test("config: set advisor thresholds", async () => {
 
   // Verify it was set
   const configRaw = await readFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     "utf8"
   );
   const config = JSON.parse(configRaw);
@@ -143,9 +143,9 @@ test("config: set advisor thresholds", async () => {
 
 test("config: set plan", async () => {
   const testHome = resolve(testDir, "home5");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: {},
@@ -162,7 +162,7 @@ test("config: set plan", async () => {
   assert.match(stdout, /plan = max5/);
 
   const configRaw = await readFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     "utf8"
   );
   const config = JSON.parse(configRaw);
@@ -173,7 +173,7 @@ test("config: set plan", async () => {
 
 test("config: rejects invalid percentage", async () => {
   const testHome = resolve(testDir, "home6");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
 
   const { stdout, stderr, code } = await runConfig(
     ["set", "advisor.fiveHourPct", "150"],
@@ -192,7 +192,7 @@ test("config: rejects invalid percentage", async () => {
 
 test("config: rejects invalid plan", async () => {
   const testHome = resolve(testDir, "home7");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
 
   const { stdout, stderr, code } = await runConfig(["set", "plan", "invalid"], {
     HOME: testHome,
@@ -208,7 +208,7 @@ test("config: rejects invalid plan", async () => {
 
 test("config: json output format", async () => {
   const testHome = resolve(testDir, "home8");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
 
   const { stdout, code } = await runConfig(
     ["--json", "get", "realUsage"],

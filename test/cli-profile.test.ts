@@ -10,7 +10,7 @@ import { parseSession, latestContextTokens } from "../src/core/transcript.js";
 import { switchTax } from "../src/core/usage.js";
 import { loadLatestHandoff, estimateTokens } from "../src/core/handoffFile.js";
 
-const testDir = resolve(tmpdir(), `cchandoff-test-${Date.now()}`);
+const testDir = resolve(tmpdir(), `warmswap-test-${Date.now()}`);
 
 // Absolute paths that survive process.chdir() — fixtures are copied next to the
 // compiled tests by pretest; fake-claude.sh stays in the source tree.
@@ -22,8 +22,8 @@ const FAKE_CLAUDE = resolve(__testDir, "../..", "test/fake-claude.sh");
 test("cli: profile add creates profile", async () => {
   try {
     const testHome = resolve(testDir, "home1");
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: {}, settings: {} }));
 
     const oldHome = process.env.HOME;
@@ -45,8 +45,8 @@ test("cli: profile add creates profile", async () => {
 test("cli: profile add rejects duplicate", async () => {
   try {
     const testHome = resolve(testDir, "home2");
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { existing: { configDir: `${testHome}/.claude-profiles/existing` } }, settings: {} }));
 
     const oldHome = process.env.HOME;
@@ -66,8 +66,8 @@ test("cli: profile add rejects duplicate", async () => {
 test("cli: profile list shows profiles", async () => {
   try {
     const testHome = resolve(testDir, "home3");
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: `${testHome}/.claude` }, work: { configDir: `${testHome}/.claude-profiles/work` } }, settings: {} }));
 
     const oldHome = process.env.HOME;
@@ -99,8 +99,8 @@ test("cli: profile list shows profiles", async () => {
 test("cli: profile remove removes from registry", async () => {
   try {
     const testHome = resolve(testDir, "home4");
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { doomed: { configDir: `${testHome}/.claude-profiles/doomed` } }, settings: {} }));
 
     const oldHome = process.env.HOME;
@@ -124,21 +124,21 @@ test("cli: doctor checks claude on PATH", async () => {
   try {
     const testHome = resolve(testDir, "doctor1");
     const claudeDir = resolve(testHome, ".claude");
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
     await mkdir(claudeDir, { recursive: true });
 
     // Write .claude.json with login info
     await writeFile(resolve(claudeDir, ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "t@example.com", organizationName: "Test Org" } }));
 
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: claudeDir } }, settings: {} }));
 
     const oldHome = process.env.HOME;
     const oldXdgConfig = process.env.XDG_CONFIG_HOME;
-    const oldClaudeBin = process.env.CCHANDOFF_CLAUDE_BIN;
+    const oldClaudeBin = process.env.WARMSWAP_CLAUDE_BIN;
     process.env.HOME = testHome;
     process.env.XDG_CONFIG_HOME = resolve(testHome, ".config");
-    process.env.CCHANDOFF_CLAUDE_BIN = FAKE_CLAUDE;
+    process.env.WARMSWAP_CLAUDE_BIN = FAKE_CLAUDE;
 
     let output = "";
     const oldLog = console.log;
@@ -154,8 +154,8 @@ test("cli: doctor checks claude on PATH", async () => {
       else delete process.env.HOME;
       if (oldXdgConfig !== undefined) process.env.XDG_CONFIG_HOME = oldXdgConfig;
       else delete process.env.XDG_CONFIG_HOME;
-      if (oldClaudeBin !== undefined) process.env.CCHANDOFF_CLAUDE_BIN = oldClaudeBin;
-      else delete process.env.CCHANDOFF_CLAUDE_BIN;
+      if (oldClaudeBin !== undefined) process.env.WARMSWAP_CLAUDE_BIN = oldClaudeBin;
+      else delete process.env.WARMSWAP_CLAUDE_BIN;
     }
   } finally {
     await rm(resolve(testDir, "doctor1"), { recursive: true, force: true });
@@ -170,10 +170,10 @@ test("cli: snapshot extracts session to handoff file", async () => {
 
     await mkdir(testProject, { recursive: true });
     await mkdir(resolve(testProject, ".git"));
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
     await mkdir(configDir, { recursive: true });
 
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir } }, settings: {} }));
 
     const oldCwd = process.cwd();
@@ -231,10 +231,10 @@ test("cli: status --json outputs stable schema", async () => {
     const configDir = resolve(testHome, ".claude");
 
     await mkdir(testProject, { recursive: true });
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
     await mkdir(configDir, { recursive: true });
 
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir }, empty: { configDir: resolve(testHome, ".claude-profiles/empty") } }, settings: { plan: "pro" } }));
 
     const oldCwd = process.cwd();
@@ -299,11 +299,11 @@ test("cli: switch --stay prepares handoff without launching", async () => {
 
     await mkdir(testProject, { recursive: true });
     await mkdir(resolve(testProject, ".git"));
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
     await mkdir(personalConfigDir, { recursive: true });
     await mkdir(workConfigDir, { recursive: true });
 
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: personalConfigDir }, work: { configDir: workConfigDir } }, settings: {} }));
 
     const oldCwd = process.cwd();
@@ -374,12 +374,12 @@ test("cli: switch shows nothing to hand off when no session", async () => {
 
     await mkdir(testProject, { recursive: true });
     await mkdir(resolve(testProject, ".git"));
-    await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+    await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
     await mkdir(personalConfigDir, { recursive: true });
     await mkdir(resolve(personalConfigDir, "projects"), { recursive: true });
     await mkdir(workConfigDir, { recursive: true });
 
-    const configPath = resolve(testHome, ".config/cchandoff/config.json");
+    const configPath = resolve(testHome, ".config/warmswap/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: personalConfigDir }, work: { configDir: workConfigDir } }, settings: {} }));
 
     const oldHome = process.env.HOME;

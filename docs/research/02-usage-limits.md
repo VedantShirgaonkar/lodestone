@@ -27,7 +27,7 @@ Supporting evidence:
 2. The user's own experience: a mid-session account switch (which converts one turn's worth of cache reads into uncached input + 1h cache writes) visibly consumed **40–80% of a 5-hour window** in one or a few turns. Nothing else about the turn changed — only the cache buckets. Limits therefore must weight cache writes/uncached input drastically heavier than reads.
 3. Community measurement tools (ccusage, Claude-Code-Usage-Monitor) successfully model window burn using exactly these pricing weights applied to JSONL usage fields.
 
-**Practical rule for cchandoff:** estimate window burn as
+**Practical rule for warmswap:** estimate window burn as
 `burn ≈ Σ (input×1 + cache_creation×2 + cache_read×0.1 + output×5) × model_price_ratio`
 labelled clearly as an *estimate* — good for relative decisions ("switching now costs ~X% of your window"), never presented as official billing.
 
@@ -37,11 +37,11 @@ For a session with context size C (tokens) on the account you're leaving:
 
 - **Naive switch (continue same conversation on account B):** first turn ≈ `C × 2` (1h cache write) + normal turn costs; plus you keep paying B's rebuilt context every turn.
 - **Handoff switch (fresh session on B with distilled state H):** first turn ≈ `(S + H) × 2` where S is Claude Code's fixed session preamble (system prompt + tools + CLAUDE.md + memory, typically 15–25k). With H ≈ 2k, that's ~10–20× cheaper *and* the smaller context compounds savings on every later turn.
-- The same math explains why resuming a stale (>1h idle) giant session **on the same account** is expensive: full re-write at 2×. cchandoff's snapshot/rehydrate therefore also helps single-account users — bigger OSS audience.
+- The same math explains why resuming a stale (>1h idle) giant session **on the same account** is expensive: full re-write at 2×. warmswap's snapshot/rehydrate therefore also helps single-account users — bigger OSS audience.
 
 ## Team plan notes
 
-Team (premium seat) users get Claude Code with per-seat limits on the same 5h + weekly structure; admins can buy extra usage. Seat usage is individual — the intern's Team seat and personal Pro account are two orgs with two separate limit pools *and two separate caches* (see 01-prompt-caching.md). Using both accounts deliberately to double available capacity is exactly the workflow cchandoff supports — the handoff makes the boundary cheap to cross. (Whether juggling two subscriptions is desirable is a user/org policy question, not a technical one; both subscriptions are paid for.)
+Team (premium seat) users get Claude Code with per-seat limits on the same 5h + weekly structure; admins can buy extra usage. Seat usage is individual — the intern's Team seat and personal Pro account are two orgs with two separate limit pools *and two separate caches* (see 01-prompt-caching.md). Using both accounts deliberately to double available capacity is exactly the workflow warmswap supports — the handoff makes the boundary cheap to cross. (Whether juggling two subscriptions is desirable is a user/org policy question, not a technical one; both subscriptions are paid for.)
 
 ## Sources
 

@@ -52,7 +52,7 @@ export async function main(argv: string[]): Promise<number> {
 
     // Handle global --version
     if (globalOpts.version) {
-      console.log(`cchandoff ${VERSION}`);
+      console.log(`warmswap ${VERSION}`);
       return 0;
     }
 
@@ -69,7 +69,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     // Shared flags (--json, --profile <name>) may appear after the command too:
-    // strip them for cchandoff's own workflow commands. launch/login/bare-launch
+    // strip them for warmswap's own workflow commands. launch/login/bare-launch
     // are exempt — everything after the profile name belongs to claude verbatim.
     const isPassthrough =
       command === "launch" || command === "login" || !COMMAND_NAMES.has(command);
@@ -170,7 +170,7 @@ export async function main(argv: string[]): Promise<number> {
     const message =
       err instanceof Error ? err.message : String(err);
     printError(message);
-    if (process.env.CCHANDOFF_DEBUG) {
+    if (process.env.WARMSWAP_DEBUG) {
       console.error(err);
     }
     return 1;
@@ -232,9 +232,9 @@ function parseGlobalArgs(argv: string[]): {
 }
 
 function printGlobalHelp(): void {
-  console.log(`cchandoff — switch Claude Code accounts with measured context handoffs
+  console.log(`warmswap — switch Claude Code accounts with measured context handoffs
 
-Usage: cchandoff [--version] [--help] [--json] [--profile <name>] <command> [options]
+Usage: warmswap [--version] [--help] [--json] [--profile <name>] <command> [options]
 
 Global options:
   --version            Show version
@@ -265,9 +265,9 @@ help                   Show command help`);
 
 function printCommandHelp(command: string): void {
   const helps: Record<string, string> = {
-    profile: `cchandoff profile — manage profiles
+    profile: `warmswap profile — manage profiles
 
-Usage: cchandoff profile <subcommand>
+Usage: warmswap profile <subcommand>
 
 Subcommands:
   add <name>           Create profile
@@ -275,46 +275,46 @@ Subcommands:
   remove <name>        Unregister profile (does not delete dir)
   rename <old> <new>   Rename profile`,
 
-    launch: `cchandoff launch — launch Claude on a profile
+    launch: `warmswap launch — launch Claude on a profile
 
-Usage: cchandoff launch <profile> [-- [claude args]]`,
+Usage: warmswap launch <profile> [-- [claude args]]`,
 
-    login: `cchandoff login — authenticate a profile
+    login: `warmswap login — authenticate a profile
 
-Usage: cchandoff login <profile>`,
+Usage: warmswap login <profile>`,
 
-    snapshot: `cchandoff snapshot — capture current session as handoff file
+    snapshot: `warmswap snapshot — capture current session as handoff file
 
-Usage: cchandoff snapshot [--session <id>] [--out <path>] [--quiet]`,
+Usage: warmswap snapshot [--session <id>] [--out <path>] [--quiet]`,
 
-    handoff: `cchandoff handoff — snapshot + optional distillation
+    handoff: `warmswap handoff — snapshot + optional distillation
 
-Usage: cchandoff handoff [--distill] [--force] [--session <id>]`,
+Usage: warmswap handoff [--distill] [--force] [--session <id>]`,
 
-    switch: `cchandoff switch — switch to a profile with handoff
+    switch: `warmswap switch — switch to a profile with handoff
 
-Usage: cchandoff switch <profile> [--distill] [--stay]`,
+Usage: warmswap switch <profile> [--distill] [--stay]`,
 
-    status: `cchandoff status — show profile burn and session status
+    status: `warmswap status — show profile burn and session status
 
-Usage: cchandoff status [--json]`,
+Usage: warmswap status [--json]`,
 
-    doctor: `cchandoff doctor — diagnose setup issues
+    doctor: `warmswap doctor — diagnose setup issues
 
-Usage: cchandoff doctor`,
+Usage: warmswap doctor`,
 
-    dash: `cchandoff dash — live TUI dashboard
+    dash: `warmswap dash — live TUI dashboard
 
-Usage: cchandoff dash [--once]
+Usage: warmswap dash [--once]
 
 Options:
   --once               Render one frame and exit (for testing)`,
 
-    keepalive: `cchandoff keepalive — keep session warm with TTL refresh pings
+    keepalive: `warmswap keepalive — keep session warm with TTL refresh pings
 
-Usage: cchandoff keepalive <profile> [--for <duration>] [--max-pings <n>]
-       cchandoff keepalive --stop [<profile>]
-       cchandoff keepalive --status
+Usage: warmswap keepalive <profile> [--for <duration>] [--max-pings <n>]
+       warmswap keepalive --stop [<profile>]
+       warmswap keepalive --status
 
 Options:
   --for <duration>     Duration (e.g. 90m, 2h) — default 90m
@@ -322,9 +322,9 @@ Options:
   --stop [<profile>]   Stop keepalive (all if no profile)
   --status             Show active keepalive schedulers`,
 
-    audit: `cchandoff audit — analyze handoff and switch events
+    audit: `warmswap audit — analyze handoff and switch events
 
-Usage: cchandoff audit [--since <duration>] [--json]
+Usage: warmswap audit [--since <duration>] [--json]
 
 Options:
   --since <duration>   Look back (e.g. 7d, 24h) — default 7d
@@ -335,7 +335,7 @@ Options:
 }
 
 function printError(message: string): void {
-  stderr.write(`cchandoff: ${message}\n`);
+  stderr.write(`warmswap: ${message}\n`);
 }
 
 // Self-execute when run directly (`node dist/cli.js …`), not just via bin shim.

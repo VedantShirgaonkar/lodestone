@@ -1,6 +1,6 @@
-# cchandoff — Architecture
+# warmswap — Architecture
 
-**One sentence:** cchandoff makes crossing a Claude Code account boundary cost ~2k tokens instead of ~2× your whole context, by pairing isolated per-account profiles with automated, measured context handoffs.
+**One sentence:** warmswap makes crossing a Claude Code account boundary cost ~2k tokens instead of ~2× your whole context, by pairing isolated per-account profiles with automated, measured context handoffs.
 
 **What it is NOT:** it does not and cannot preserve Anthropic's server-side prompt cache across organizations (impossible by design — see ADR-001). It does not touch credentials. It does not proxy or intercept API traffic. It is a local workflow tool over documented Claude Code surfaces: `CLAUDE_CONFIG_DIR`, transcript JSONL, hooks, skills, statusline, headless CLI.
 
@@ -8,11 +8,11 @@
 
 ```
                        ┌────────────────────────────────────────────┐
-                       │            cchandoff CLI (Node, 0 deps)    │
+                       │            warmswap CLI (Node, 0 deps)    │
                        │                                            │
  ┌───────────────┐     │  profiles   snapshot   switch    status    │
  │ ~/.config/     │◄───┤  registry   engine     orchestr. & audit   │
- │  cchandoff/    │    └──────┬─────────┬──────────┬─────────┬──────┘
+ │  warmswap/    │    └──────┬─────────┬──────────┬─────────┬──────┘
  │  config.json   │           │         │          │         │
  └───────────────┘           ▼         ▼          ▼         ▼
         profile A     ┌──────────┐ ┌─────────┐ ┌────────┐ ┌─────────┐
@@ -28,9 +28,9 @@
 ## Components
 
 ### 1. Profile manager (`core/profiles.ts`, `commands/profile.ts`, `commands/launch.ts`)
-- Registry in `~/.config/cchandoff/config.json`: `{ "profiles": { "<name>": { "configDir": "<abs path>", "label": "..." } }, "settings": {...} }`.
-- `cchandoff profile add <name>`: creates `~/.claude-profiles/<name>/`, registers it, offers `cchandoff <name> /login`. **The existing `~/.claude` is adopted in place as the first profile** (no migration, history intact).
-- `cchandoff <name> [claude args…]`: `exec`s `claude` with `CLAUDE_CONFIG_DIR=<dir>` in the current cwd. Auth isolation is guaranteed upstream: macOS Keychain entries are keyed by sha256(config dir); Linux/Windows keep `.credentials.json` inside the dir. cchandoff never reads either.
+- Registry in `~/.config/warmswap/config.json`: `{ "profiles": { "<name>": { "configDir": "<abs path>", "label": "..." } }, "settings": {...} }`.
+- `warmswap profile add <name>`: creates `~/.claude-profiles/<name>/`, registers it, offers `warmswap <name> /login`. **The existing `~/.claude` is adopted in place as the first profile** (no migration, history intact).
+- `warmswap <name> [claude args…]`: `exec`s `claude` with `CLAUDE_CONFIG_DIR=<dir>` in the current cwd. Auth isolation is guaranteed upstream: macOS Keychain entries are keyed by sha256(config dir); Linux/Windows keep `.credentials.json` inside the dir. warmswap never reads either.
 - Optional shared auto-memory: `profile link-memory` sets `autoMemoryDirectory` in each profile's settings.json to one shared path, so Claude's learned notes cross accounts (local markdown, no billing).
 
 ### 2. Transcript reader (`core/transcript.ts`)
@@ -53,12 +53,12 @@ Output: `.claude/handoff/latest.md` (human-readable markdown, YAML frontmatter: 
 `claude --resume <session> --fork-session -p "<distill prompt per HANDOFF template>" --max-turns 1` executed **on the source profile**, where the conversation is still ~all cache reads (0.1×). Fork keeps the real session untouched. Guard: if the session's last activity is >55 min old (1h TTL nearly lapsed), refuse by default with an explanation (`--force` overrides) — distilling against a cold cache would itself cost a full 2× rewrite. Distilled prose replaces the skeleton's narrative sections; deterministic facts (files, todos, git) are kept verbatim.
 
 ### 5. Rehydration (hooks; `commands/hook.ts`, installed by `commands/init.ts`)
-- **SessionStart** (matchers `startup`, `clear`): if `.claude/handoff/latest.md` exists for this cwd, is unconsumed, and is younger than `maxAgeDays` (default 7): emit `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "<framed handoff>"}, "systemMessage": "cchandoff: restored handoff (…tokens, from <profile>, <age>)"}`, then mark consumed. The framing wrapper tells Claude what this block is and instructs it to verify current file/git state before trusting details.
-- **SessionEnd** + **PreCompact**: run `cchandoff hook session-end --transcript <path>` → auto-snapshot. Budget <2s, exit 0 always (failures logged to `~/.config/cchandoff/cchandoff.log`, never surfaced as session errors).
-- Installed at **user level per profile** (each profile's `settings.json`) by `cchandoff init`; `--project` variant writes `.claude/settings.json` for team-shared setups. Settings edits are surgical read-modify-write with `.bak` backup and strict JSON validation; refuse on unparseable files.
+- **SessionStart** (matchers `startup`, `clear`): if `.claude/handoff/latest.md` exists for this cwd, is unconsumed, and is younger than `maxAgeDays` (default 7): emit `{"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": "<framed handoff>"}, "systemMessage": "warmswap: restored handoff (…tokens, from <profile>, <age>)"}`, then mark consumed. The framing wrapper tells Claude what this block is and instructs it to verify current file/git state before trusting details.
+- **SessionEnd** + **PreCompact**: run `warmswap hook session-end --transcript <path>` → auto-snapshot. Budget <2s, exit 0 always (failures logged to `~/.config/warmswap/warmswap.log`, never surfaced as session errors).
+- Installed at **user level per profile** (each profile's `settings.json`) by `warmswap init`; `--project` variant writes `.claude/settings.json` for team-shared setups. Settings edits are surgical read-modify-write with `.bak` backup and strict JSON validation; refuse on unparseable files.
 
 ### 6. Switch orchestrator (`commands/switch.ts`)
-`cchandoff switch <profile> [--distill] [--stay]`:
+`warmswap switch <profile> [--distill] [--stay]`:
 1. Locate active project + freshest session on the *current* profile (env `CLAUDE_CONFIG_DIR` or registry default).
 2. Snapshot (± distill). 3. Print the measured delta: handoff tokens vs live context tokens, est. % of 5h window saved. 4. Launch target profile in same cwd (SessionStart hook injects). `--stay` skips the launch (prepare only).
 Inside a session, the `/handoff` **skill** (project-installable) does the same capture conversationally, then tells the user the one command to run.
@@ -77,7 +77,7 @@ Checks: `claude` on PATH + version ≥ 2.0; profiles resolvable + logged-in mark
 
 - **Handoff markdown**: sections `Goal`, `State of work`, `Key decisions & constraints`, `Files in play`, `Last exchange`, `Next steps`, `Open questions`. Target ≤ 2,500 tokens (hard cap 4,000; truncate oldest-first with notice).
 - **`latest.meta.json`**: `{schema: 1, created, sourceProfile, sourceSession, project, branch, contextTokens, distilled: bool, consumed: bool, consumedBy?: {profile, session, at}}`.
-- **cchandoff config**: `{schema: 1, profiles: {...}, settings: {maxAgeDays, injectOn: ["startup","clear"], autoSnapshot: true, weights: {...}}}`.
+- **warmswap config**: `{schema: 1, profiles: {...}, settings: {maxAgeDays, injectOn: ["startup","clear"], autoSnapshot: true, weights: {...}}}`.
 
 ## Failure philosophy
 

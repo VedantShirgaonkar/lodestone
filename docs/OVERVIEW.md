@@ -1,7 +1,5 @@
 # What this is, in one page
 
-*(Tool name pending final decision — currently `cchandoff` throughout.)*
-
 ## The delivery form: an npm CLI package that installs its own integrations
 
 This is **not** an MCP server and **not** a VS Code extension (one is planned — see last section). It is a single **command-line program distributed on npm** (`npm install -g …`), zero runtime dependencies. You run it once to set things up; after that it mostly works *through Claude Code itself*, because the setup step plugs three small integrations into Claude Code's official extension points:

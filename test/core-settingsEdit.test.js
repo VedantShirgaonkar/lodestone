@@ -4,7 +4,7 @@ import { installHooks, uninstallHooks, } from "../src/core/settingsEdit.js";
 import { mkdirSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-const testDir = join(tmpdir(), "cchandoff-test-settings");
+const testDir = join(tmpdir(), "warmswap-test-settings");
 test.before(() => {
     if (existsSync(testDir)) {
         rmSync(testDir, { recursive: true });
@@ -20,7 +20,7 @@ test("settingsEdit: installHooks creates settings.json", () => {
     const configDir = join(testDir, "config1");
     mkdirSync(configDir, { recursive: true });
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
+        sessionStartCmd: "warmswap hook session-start",
     });
     const settingsPath = join(configDir, "settings.json");
     assert.ok(existsSync(settingsPath));
@@ -30,7 +30,7 @@ test("settingsEdit: installHooks creates settings.json", () => {
 test("settingsEdit: installHooks is idempotent", () => {
     const configDir = join(testDir, "config2");
     mkdirSync(configDir, { recursive: true });
-    const cmd = "cchandoff hook session-start";
+    const cmd = "warmswap hook session-start";
     installHooks(configDir, { sessionStartCmd: cmd });
     const afterFirst = readFileSync(join(configDir, "settings.json"), "utf8");
     installHooks(configDir, { sessionStartCmd: cmd });
@@ -43,11 +43,11 @@ test("settingsEdit: installHooks preserves existing hooks", () => {
     mkdirSync(configDir, { recursive: true });
     // First install
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
+        sessionStartCmd: "warmswap hook session-start",
     });
     // Second install with different hook
     installHooks(configDir, {
-        sessionEndCmd: "cchandoff hook session-end",
+        sessionEndCmd: "warmswap hook session-end",
     });
     const settings = JSON.parse(readFileSync(join(configDir, "settings.json"), "utf8"));
     const hooks = settings.hooks;
@@ -59,13 +59,13 @@ test("settingsEdit: installHooks creates backup", () => {
     const configDir = join(testDir, "config4");
     mkdirSync(configDir, { recursive: true });
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
+        sessionStartCmd: "warmswap hook session-start",
     });
     const settingsPath = join(configDir, "settings.json");
     const backupPath = `${settingsPath}.bak`;
     // After second install, backup should exist
     installHooks(configDir, {
-        sessionEndCmd: "cchandoff hook session-end",
+        sessionEndCmd: "warmswap hook session-end",
     });
     assert.ok(existsSync(backupPath));
 });
@@ -76,14 +76,14 @@ test("settingsEdit: installHooks rejects invalid JSON", () => {
     const settingsPath = join(configDir, "settings.json");
     require("node:fs").writeFileSync(settingsPath, "{ invalid json");
     assert.throws(() => installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
+        sessionStartCmd: "warmswap hook session-start",
     }), /Invalid JSON/);
 });
-test("settingsEdit: uninstallHooks removes cchandoff hooks", () => {
+test("settingsEdit: uninstallHooks removes warmswap hooks", () => {
     const configDir = join(testDir, "config6");
     mkdirSync(configDir, { recursive: true });
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
+        sessionStartCmd: "warmswap hook session-start",
     });
     uninstallHooks(configDir);
     const settings = JSON.parse(readFileSync(join(configDir, "settings.json"), "utf8"));
@@ -99,18 +99,18 @@ test("settingsEdit: installHooks double-install proves idempotence", () => {
     mkdirSync(configDir, { recursive: true });
     // Install all three hook types
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
-        sessionEndCmd: "cchandoff hook session-end",
-        preCompactCmd: "cchandoff hook pre-compact",
+        sessionStartCmd: "warmswap hook session-start",
+        sessionEndCmd: "warmswap hook session-end",
+        preCompactCmd: "warmswap hook pre-compact",
     });
     const firstRead = readFileSync(join(configDir, "settings.json"), "utf8");
     const firstParse = JSON.parse(firstRead);
     const firstHookCount = JSON.stringify(firstParse).length;
     // Install again with same commands
     installHooks(configDir, {
-        sessionStartCmd: "cchandoff hook session-start",
-        sessionEndCmd: "cchandoff hook session-end",
-        preCompactCmd: "cchandoff hook pre-compact",
+        sessionStartCmd: "warmswap hook session-start",
+        sessionEndCmd: "warmswap hook session-end",
+        preCompactCmd: "warmswap hook pre-compact",
     });
     const secondRead = readFileSync(join(configDir, "settings.json"), "utf8");
     const secondParse = JSON.parse(secondRead);

@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, copyFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { cchandoffConfigPath } from "./paths.js";
+import { warmswapConfigPath } from "./paths.js";
 
 export interface ProfileConfig {
   configDir: string;
@@ -23,39 +23,39 @@ export interface SettingsConfig {
   advisor?: AdvisorSettings;
 }
 
-export interface CchandoffConfig {
+export interface WarmswapConfig {
   schema: number;
   profiles: Record<string, ProfileConfig>;
   settings: SettingsConfig;
 }
 
 /**
- * Load the cchandoff config from disk.
+ * Load the warmswap config from disk.
  * Returns a default config if the file doesn't exist.
  */
-export function loadConfig(configPath?: string): CchandoffConfig {
-  const path = configPath ?? cchandoffConfigPath();
+export function loadConfig(configPath?: string): WarmswapConfig {
+  const path = configPath ?? warmswapConfigPath();
   if (!existsSync(path)) {
     return defaultConfig();
   }
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw);
-    return parsed as CchandoffConfig;
+    return parsed as WarmswapConfig;
   } catch {
     return defaultConfig();
   }
 }
 
 /**
- * Save the cchandoff config to disk atomically (write to tmp, then rename).
+ * Save the warmswap config to disk atomically (write to tmp, then rename).
  * Creates a backup (.bak) before overwriting.
  */
 export function saveConfig(
-  config: CchandoffConfig,
+  config: WarmswapConfig,
   configPath?: string
 ): void {
-  const path = configPath ?? cchandoffConfigPath();
+  const path = configPath ?? warmswapConfigPath();
   const dir = dirname(path);
 
   // Ensure directory exists
@@ -74,7 +74,7 @@ export function saveConfig(
   renameSync(tmpPath, path);
 }
 
-function defaultConfig(): CchandoffConfig {
+function defaultConfig(): WarmswapConfig {
   return {
     schema: 1,
     profiles: {},

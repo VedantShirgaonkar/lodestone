@@ -1,4 +1,4 @@
-# Evaluation: Does cchandoff actually kill the switch tax?
+# Evaluation: Does warmswap actually kill the switch tax?
 
 Methodology for validating the core claim — that a handoff switch costs an order of magnitude less than a naive account switch — plus the live protocol and a results section to be filled during Phase 7 validation.
 
@@ -24,11 +24,11 @@ At C = 150k context, S ≈ 20k, H ≈ 1.5–2.5k:
 
 ## Live protocol (Phase 7, requires the user's two accounts, est. spend: one controlled session ≈ 3–6% of one 5h window per arm)
 
-1. Setup: `cchandoff profile add work && cchandoff login work && cchandoff init && cchandoff config set realUsage on`. `cchandoff doctor` green on both profiles.
+1. Setup: `warmswap profile add work && warmswap login work && warmswap init && warmswap config set realUsage on`. `warmswap doctor` green on both profiles.
 2. Build a controlled working session on `personal` in a test repo: scripted prompts that read ~6 files and make ~3 edits until context ≈ 40–60k (visible in statusline). Record session id, final context tokens, `five_hour.used_percentage`.
-3. **Handoff arm:** `/handoff` in-session (Tier 1), quit, `cchandoff switch work`, ask one continuation question, then 5 scripted follow-ups. Record from work-profile JSONL: first-turn usage, per-turn usage; quality judgment.
-4. **Naive-arm measurement without burning a real replay** (default): compute from the recorded C via the formula, cross-checked against the user's HISTORICAL naive switches — `cchandoff audit` heuristic detector over June–July transcripts in `~/.claude` finds real past `/login`-era boundary events with actual first-turn cache_creation numbers. (Optional strict arm, only with explicit consent: actually replay the session on B once and measure.)
-5. **Keepalive check:** `cchandoff keepalive personal --for 5m` with `CCHANDOFF_KEEPALIVE_IMMEDIATE=1` → inspect the ping's JSONL usage per secondary metric (d).
+3. **Handoff arm:** `/handoff` in-session (Tier 1), quit, `warmswap switch work`, ask one continuation question, then 5 scripted follow-ups. Record from work-profile JSONL: first-turn usage, per-turn usage; quality judgment.
+4. **Naive-arm measurement without burning a real replay** (default): compute from the recorded C via the formula, cross-checked against the user's HISTORICAL naive switches — `warmswap audit` heuristic detector over June–July transcripts in `~/.claude` finds real past `/login`-era boundary events with actual first-turn cache_creation numbers. (Optional strict arm, only with explicit consent: actually replay the session on B once and measure.)
+5. **Keepalive check:** `warmswap keepalive personal --for 5m` with `WARMSWAP_KEEPALIVE_IMMEDIATE=1` → inspect the ping's JSONL usage per secondary metric (d).
 6. Fill Results below; screenshots of dash + statusline for the README/launch post.
 
 ## Threats to validity

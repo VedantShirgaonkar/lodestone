@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import { loadConfig, saveConfig } from "../core/config.js";
-import { cchandoffConfigPath } from "../core/paths.js";
+import { warmswapConfigPath } from "../core/paths.js";
 
 interface CommandOptions {
   json: boolean;
@@ -24,7 +24,7 @@ export async function config(args: string[], opts: CommandOptions): Promise<numb
     } else if (subcommand === "set") {
       return configSet(key, value, opts);
     } else {
-      console.error("cchandoff config: usage: config get|set <key> [value]");
+      console.error("warmswap config: usage: config get|set <key> [value]");
       console.error(
         "  keys: realUsage, advisor.fiveHourPct, advisor.weeklyPct, plan"
       );
@@ -32,14 +32,14 @@ export async function config(args: string[], opts: CommandOptions): Promise<numb
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff config: ${msg}`);
+    console.error(`warmswap config: ${msg}`);
     return 1;
   }
 }
 
 function configGet(key: string | undefined, opts: CommandOptions): number {
   if (!key) {
-    console.error("cchandoff config get: missing key");
+    console.error("warmswap config get: missing key");
     return 2;
   }
 
@@ -55,7 +55,7 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
   } else if (key === "plan") {
     value = config.settings.plan ?? "pro";
   } else {
-    console.error(`cchandoff config: unknown key: ${key}`);
+    console.error(`warmswap config: unknown key: ${key}`);
     return 1;
   }
 
@@ -70,7 +70,7 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
 
 function configSet(key: string | undefined, value: string | undefined, opts: CommandOptions): number {
   if (!key || !value) {
-    console.error("cchandoff config set: missing key or value");
+    console.error("warmswap config set: missing key or value");
     return 2;
   }
 
@@ -83,7 +83,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.fiveHourPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {
-        console.error("cchandoff config: fiveHourPct must be 0-100");
+        console.error("warmswap config: fiveHourPct must be 0-100");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -93,7 +93,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.weeklyPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {
-        console.error("cchandoff config: weeklyPct must be 0-100");
+        console.error("warmswap config: weeklyPct must be 0-100");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -104,19 +104,19 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
       const validPlans = ["pro", "max5", "max20", "team"];
       if (!validPlans.includes(value)) {
         console.error(
-          `cchandoff config: plan must be one of: ${validPlans.join(", ")}`
+          `warmswap config: plan must be one of: ${validPlans.join(", ")}`
         );
         return 1;
       }
       config.settings.plan = value;
     } else {
-      console.error(`cchandoff config: unknown key: ${key}`);
+      console.error(`warmswap config: unknown key: ${key}`);
       return 1;
     }
 
     saveConfig(config);
 
-    const configPath = cchandoffConfigPath();
+    const configPath = warmswapConfigPath();
     if (opts.json) {
       console.log(JSON.stringify({ key, value, configPath }));
     } else {
@@ -127,7 +127,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff config: ${msg}`);
+    console.error(`warmswap config: ${msg}`);
     return 1;
   }
 }

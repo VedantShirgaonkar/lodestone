@@ -11,7 +11,7 @@ import {
   fetchOAuthQuota,
 } from "../src/core/realUsage.js";
 
-const testDir = join(tmpdir(), `cchandoff-test-realUsage-${Date.now()}`);
+const testDir = join(tmpdir(), `warmswap-test-realUsage-${Date.now()}`);
 
 test("realUsage: writes and reads usage cache", async () => {
   const configDir = join(testDir, "config1");

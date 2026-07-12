@@ -1,5 +1,5 @@
 {
-  "name": "cchandoff",
+  "name": "warmswap",
   "version": "0.1.0",
   "description": "Switch Claude Code accounts without burning your usage limits: isolated per-account profiles + automated context handoffs, measured.",
   "license": "MIT",
@@ -8,8 +8,7 @@
     "node": ">=20"
   },
   "bin": {
-    "cchandoff": "bin/cchandoff.js",
-    "cch": "bin/cchandoff.js"
+    "warmswap": "bin/warmswap.js"
   },
   "files": [
     "bin",
@@ -40,12 +39,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/cchandoff"
+    "url": "https://github.com/OWNER/warmswap"
   },
   "bugs": {
-    "url": "https://github.com/OWNER/cchandoff/issues"
+    "url": "https://github.com/OWNER/warmswap/issues"
   },
-  "homepage": "https://github.com/OWNER/cchandoff",
+  "homepage": "https://github.com/OWNER/warmswap",
   "author": "",
   "devDependencies": {
     "@types/node": "^22.10.0",

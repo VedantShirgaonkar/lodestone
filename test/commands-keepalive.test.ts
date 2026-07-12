@@ -8,8 +8,8 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "..", "..", "bin/cchandoff.js");
-const testDir = resolve(tmpdir(), `cchandoff-test-keepalive-${Date.now()}`);
+const CLI = resolve(__testDir, "..", "..", "bin/warmswap.js");
+const testDir = resolve(tmpdir(), `warmswap-test-keepalive-${Date.now()}`);
 const FIXTURE_SESSION = resolve(__testDir, "fixtures", "session-small.jsonl");
 
 function runKeepalive(
@@ -52,11 +52,11 @@ function runKeepalive(
 
 test("keepalive: --status shows no active schedulers initially", async () => {
   const testHome = resolve(testDir, "home-status");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   const configDir = resolve(testHome, ".claude");
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -80,10 +80,10 @@ test("keepalive: --status shows no active schedulers initially", async () => {
 
 test("keepalive: rejects missing profile", async () => {
   const testHome = resolve(testDir, "home-missing");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(resolve(testHome, ".claude"), { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir: resolve(testHome, ".claude") } },
@@ -108,11 +108,11 @@ test("keepalive: rejects missing profile", async () => {
 
 test("keepalive: rejects when no session in project", async () => {
   const testHome = resolve(testDir, "home-no-session");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   const configDir = resolve(testHome, ".claude");
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -140,11 +140,11 @@ test("keepalive: rejects when no session in project", async () => {
 
 test("keepalive: parseDuration accepts valid formats", async () => {
   const testHome = resolve(testDir, "home-durations");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   const configDir = resolve(testHome, ".claude");
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -177,10 +177,10 @@ test("keepalive: plan printout shows schedule and cost", async () => {
 
   const testHome = resolve(testDir, "home-plan");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/cchandoff"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/cchandoff/config.json"),
+    resolve(testHome, ".config/warmswap/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },

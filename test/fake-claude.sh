@@ -11,7 +11,7 @@ for arg in "$@"; do
   fi
 done
 
-if [ -z "$CCHANDOFF_FAKE_CLAUDE_LOG" ]; then
+if [ -z "$WARMSWAP_FAKE_CLAUDE_LOG" ]; then
   exit 0
 fi
 
@@ -24,7 +24,7 @@ fi
   env | sort
   echo "=== time ==="
   date -u +%s
-} >> "$CCHANDOFF_FAKE_CLAUDE_LOG"
+} >> "$WARMSWAP_FAKE_CLAUDE_LOG"
 
 # Output stdout if specified
 if [ -n "$FAKE_CLAUDE_STDOUT" ]; then

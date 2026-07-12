@@ -36,7 +36,7 @@ A personal Pro account and a Team-plan account are **different organizations**. 
 1. When you switch accounts mid-conversation (`/login`), the next turn sends the *entire conversation* to an org that has never seen any of it. Every token that was a 0.1× cache read becomes fresh input plus a 2× 1-hour cache write.
 2. **No client-side software can ever make org B read org A's cache.** The cache lives on Anthropic's servers, keyed inside an org/workspace boundary that exists for privacy isolation. "Preserving the cache across accounts" is not an engineering problem — it's cryptographically/architecturally sealed off, by design.
 
-The only lever a local tool controls is **how many tokens must be re-sent** after a switch. That is the lever cchandoff pulls: replace a 100–170k-token conversation replay with a 1–3k-token structured handoff.
+The only lever a local tool controls is **how many tokens must be re-sent** after a switch. That is the lever warmswap pulls: replace a 100–170k-token conversation replay with a 1–3k-token structured handoff.
 
 ## Cost arithmetic of one account switch (why it eats 40–80% of a window)
 

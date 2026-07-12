@@ -2,8 +2,8 @@ import { appendFileSync, existsSync, renameSync, statSync, mkdirSync } from "nod
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-const LOG_DIR = join(homedir(), ".config", "cchandoff");
-const LOG_FILE = join(LOG_DIR, "cchandoff.log");
+const LOG_DIR = join(homedir(), ".config", "warmswap");
+const LOG_FILE = join(LOG_DIR, "warmswap.log");
 const MAX_SIZE_BYTES = 1024 * 1024; // 1MB
 
 function ensureLogDir(): void {

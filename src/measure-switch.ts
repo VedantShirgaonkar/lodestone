@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * cchandoff measure-switch — evaluation harness
+ * warmswap measure-switch — evaluation harness
  *
  * Measures handoff vs. naive switch cost on fixture or real data.
  *
@@ -118,7 +118,7 @@ function findLatestSession(
   projectPath: string
 ): string | null {
   try {
-    // Munge cwd like cchandoff does: /path/to/project → -path-to-project
+    // Munge cwd like warmswap does: /path/to/project → -path-to-project
     const munged = mungeCwd(projectPath);
     const projectsDir = join(configDir, "projects", munged);
 
@@ -324,7 +324,7 @@ async function measure(
  * Format and print results.
  */
 function printResults(result: EvaluationResult, verbose?: boolean): void {
-  console.log("cchandoff measure-switch evaluation");
+  console.log("warmswap measure-switch evaluation");
   console.log("=====================================\n");
 
   console.log("Context & Handoff:");

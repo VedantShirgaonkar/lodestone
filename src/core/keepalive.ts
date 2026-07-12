@@ -24,7 +24,7 @@ export interface KeepaliveState {
  * Get keepalive pidfile path for a profile
  */
 export function keepalivePidfilePath(homeDir: string, profile: string): string {
-  return join(homeDir, ".config", "cchandoff", `keepalive-${profile}.json`);
+  return join(homeDir, ".config", "warmswap", `keepalive-${profile}.json`);
 }
 
 /**
@@ -43,7 +43,7 @@ export function computePingSchedule(
 } {
   // Ping interval: 52 minutes by default, overridable via env
   const pingIntervalMs =
-    parseInt(process.env.CCHANDOFF_KEEPALIVE_INTERVAL_MS || "", 10) ||
+    parseInt(process.env.WARMSWAP_KEEPALIVE_INTERVAL_MS || "", 10) ||
     52 * 60 * 1000;
 
   // How many pings fit in the duration?
@@ -121,12 +121,12 @@ export function spawnKeepaliveScheduler(
 
   const env = {
     ...process.env,
-    CCHANDOFF_KEEPALIVE_PROFILE: profile,
-    CCHANDOFF_KEEPALIVE_SESSION_ID: sessionId,
-    CCHANDOFF_KEEPALIVE_CONTEXT_TOKENS: String(contextTokens),
-    CCHANDOFF_KEEPALIVE_DURATION_MS: String(durationMs),
-    CCHANDOFF_KEEPALIVE_MAX_PINGS: String(maxPings),
-    CCHANDOFF_KEEPALIVE_INTERVAL_MS: String(schedule.pingIntervalMs),
+    WARMSWAP_KEEPALIVE_PROFILE: profile,
+    WARMSWAP_KEEPALIVE_SESSION_ID: sessionId,
+    WARMSWAP_KEEPALIVE_CONTEXT_TOKENS: String(contextTokens),
+    WARMSWAP_KEEPALIVE_DURATION_MS: String(durationMs),
+    WARMSWAP_KEEPALIVE_MAX_PINGS: String(maxPings),
+    WARMSWAP_KEEPALIVE_INTERVAL_MS: String(schedule.pingIntervalMs),
   };
 
   const child = spawn(process.execPath, nodeArgs, {

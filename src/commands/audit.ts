@@ -36,7 +36,7 @@ interface AuditOutput {
 }
 
 /**
- * cchandoff audit — analyze handoff and switch events
+ * warmswap audit — analyze handoff and switch events
  *
  * audit [--since <days>d] [--json]
  */
@@ -83,7 +83,7 @@ export async function audit(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : String(err);
-    stderr.write(`cchandoff audit: ${message}\n`);
+    stderr.write(`warmswap audit: ${message}\n`);
     return 1;
   }
 }

@@ -11,7 +11,7 @@ export async function login(
   _opts: CommandOptions
 ): Promise<number> {
   if (args.length === 0 || !args[0]) {
-    console.error("cchandoff login: missing profile name");
+    console.error("warmswap login: missing profile name");
     return 2;
   }
 
@@ -21,7 +21,7 @@ export async function login(
     const config = loadConfig();
     const profileCfg = config.profiles[profileName];
     if (!profileCfg) {
-      console.error(`cchandoff login: profile not found: ${profileName}`);
+      console.error(`warmswap login: profile not found: ${profileName}`);
       return 1;
     }
 
@@ -29,7 +29,7 @@ export async function login(
     return launchInteractive(profile, ["/login"]);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff login: ${msg}`);
+    console.error(`warmswap login: ${msg}`);
     return 1;
   }
 }

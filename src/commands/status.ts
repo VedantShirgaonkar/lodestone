@@ -187,7 +187,7 @@ export async function status(
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff status: ${msg}`);
+    console.error(`warmswap status: ${msg}`);
     return 1;
   }
 }

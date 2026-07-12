@@ -4,7 +4,7 @@ import { renderHandoff, saveHandoff, loadLatestHandoff, markConsumed, estimateTo
 import { mkdirSync, rmSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-const testDir = join(tmpdir(), "cchandoff-test-handoff");
+const testDir = join(tmpdir(), "warmswap-test-handoff");
 test.before(() => {
     if (existsSync(testDir)) {
         rmSync(testDir, { recursive: true });

@@ -35,7 +35,7 @@ export async function init(args: string[], opts: CommandOptions): Promise<number
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff init: ${msg}`);
+    console.error(`warmswap init: ${msg}`);
     return 1;
   }
 }
@@ -48,10 +48,10 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
     const config = loadConfig();
 
     // Get the hook command (allow override via env for testing)
-    const hookCmd = process.env.CCHANDOFF_HOOK_CMD || "cchandoff hook";
+    const hookCmd = process.env.WARMSWAP_HOOK_CMD || "warmswap hook";
 
-    // Create ~/.config/cchandoff if it doesn't exist
-    const configDir = dirname(config.settings ? "" : join(homedir(), ".config", "cchandoff", "config.json"));
+    // Create ~/.config/warmswap if it doesn't exist
+    const configDir = dirname(config.settings ? "" : join(homedir(), ".config", "warmswap", "config.json"));
     mkdirSync(configDir, { recursive: true });
 
     // Install hooks into each profile
@@ -87,7 +87,7 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
           const existingStatusLine = settings.statusLine as Record<string, unknown> | undefined;
           if (existingStatusLine && typeof existingStatusLine === "object") {
             const existingCmd = existingStatusLine.command;
-            const ourCmd = "cchandoff statusline";
+            const ourCmd = "warmswap statusline";
             if (
               existingCmd &&
               typeof existingCmd === "string" &&
@@ -104,7 +104,7 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
           // Set statusLine
           settings.statusLine = {
             type: "command",
-            command: "cchandoff statusline",
+            command: "warmswap statusline",
           };
 
           mkdirSync(dirname(settingsPath), { recursive: true });
@@ -120,7 +120,7 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff init: ${msg}`);
+    console.error(`warmswap init: ${msg}`);
     return 1;
   }
 }
@@ -136,7 +136,7 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
     const settingsPath = join(claudeDir, "settings.json");
 
     // Get the hook command
-    const hookCmd = process.env.CCHANDOFF_HOOK_CMD || "cchandoff hook";
+    const hookCmd = process.env.WARMSWAP_HOOK_CMD || "warmswap hook";
 
     // Install hooks
     mkdirSync(claudeDir, { recursive: true });
@@ -200,7 +200,7 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
           typeof existingStatusLine === "object"
         ) {
           const existingCmd = existingStatusLine.command;
-          const ourCmd = "cchandoff statusline";
+          const ourCmd = "warmswap statusline";
           if (
             existingCmd &&
             typeof existingCmd === "string" &&
@@ -216,7 +216,7 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
 
         settings.statusLine = {
           type: "command",
-          command: "cchandoff statusline",
+          command: "warmswap statusline",
         };
 
         writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
@@ -231,7 +231,7 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`cchandoff init --project: ${msg}`);
+    console.error(`warmswap init --project: ${msg}`);
     return 1;
   }
 }

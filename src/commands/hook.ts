@@ -189,7 +189,7 @@ async function hookSessionStart(input: unknown): Promise<number> {
         hookEventName: "SessionStart",
         additionalContext,
       },
-      systemMessage: `cchandoff: restored handoff (~${tokens} tokens, from ${meta.sourceProfile || "unknown"}, ${ageStr})`,
+      systemMessage: `warmswap: restored handoff (~${tokens} tokens, from ${meta.sourceProfile || "unknown"}, ${ageStr})`,
     };
 
     stdout.write(JSON.stringify(output) + "\n");
@@ -390,8 +390,8 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
 
     // Emit warning
     const message =
-      `cchandoff: ${warningWindow} window at ${warningUtilization}% — ` +
-      `cache is warm: /handoff now is cheap, then cchandoff switch <other>`;
+      `warmswap: ${warningWindow} window at ${warningUtilization}% — ` +
+      `cache is warm: /handoff now is cheap, then warmswap switch <other>`;
 
     const output: HookOutput = {
       hookSpecificOutput: {
@@ -475,7 +475,7 @@ function writeAdvisorState(
  */
 async function hookSelfTest(): Promise<number> {
   try {
-    const tempDir = `/tmp/cchandoff-hook-test-${Date.now()}`;
+    const tempDir = `/tmp/warmswap-hook-test-${Date.now()}`;
     mkdirSync(tempDir, { recursive: true });
 
     // Create synthetic handoff

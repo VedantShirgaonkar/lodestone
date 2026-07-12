@@ -2,7 +2,7 @@ import { stdin, stdout } from "node:process";
 import { existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { projectsDirFor } from "../core/paths.js";
-import { latestContextTokens, parseSession } from "../core/transcript.js";
+import { latestContextTokens, latestSession, parseSession } from "../core/transcript.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { windowBurn } from "../core/usage.js";
 import { loadConfig } from "../core/config.js";
@@ -18,7 +18,9 @@ interface StatuslineInput {
   session_id?: string;
   transcript_path?: string;
   model?: string;
-  workspace?: string;
+  workspace?: {
+    current_dir?: string;
+  } | string;
   version?: string;
   cost?: {
     total_cost_usd?: number;
@@ -68,7 +70,7 @@ export async function statusline(): Promise<number> {
     // Read stdin with timeout
     const input = await readStdinWithTimeout(150);
     if (!input) {
-      console.log("⇄ cchandoff");
+      console.log("⇄ warmswap");
       return 0;
     }
 
@@ -80,13 +82,22 @@ export async function statusline(): Promise<number> {
       ? ` · ctx ${typedInput.context_window.used_percentage}%`
       : "";
 
+    // Cache warmth segment: locate latest session for workspace and show TTL
+    let cacheWarmthStr = "";
+    const currentProfile = resolveActingProfile();
+    if (currentProfile) {
+      const workspaceCwd =
+        typeof typedInput.workspace === "object" && typedInput.workspace?.current_dir
+          ? typedInput.workspace.current_dir
+          : process.cwd();
+      cacheWarmthStr = getCacheWarmthSegment(currentProfile.configDir, workspaceCwd);
+    }
+
     // Real rate_limits take priority over estimate
     let fiveHourStr = "";
     let weeklyStr = "";
     let pacingMarker = "";
     let advisorGlyph = "";
-
-    const currentProfile = resolveActingProfile();
 
     if (typedInput.rate_limits) {
       // Write to usage cache for other tools
@@ -198,11 +209,11 @@ export async function statusline(): Promise<number> {
     }
 
     const line =
-      `⇄ ${profile}${contextPctStr}${fiveHourStr}${weeklyStr}${switchTaxStr}${advisorGlyph}`;
+      `⇄ ${profile}${contextPctStr}${cacheWarmthStr}${fiveHourStr}${weeklyStr}${switchTaxStr}${advisorGlyph}`;
     console.log(line);
     return 0;
   } catch {
-    console.log("⇄ cchandoff");
+    console.log("⇄ warmswap");
     return 0;
   }
 }
@@ -219,6 +230,44 @@ function formatDuration(seconds: number): string {
     return `${hours}h${mins > 0 ? mins + "m" : ""}`;
   }
   return `${mins}m`;
+}
+
+/**
+ * Calculate cache warmth segment for the current workspace.
+ * Returns "· cache XXm" or "· cache cold" or empty string if no session.
+ * Computes idleMinutes from file mtime only (not by parsing transcript).
+ * TTL is 1 hour, so remaining = max(0, 60 - idleMinutes).
+ */
+function getCacheWarmthSegment(
+  configDir: string,
+  workspaceCwd?: string
+): string {
+  if (!workspaceCwd) {
+    return ""; // No workspace dir provided, omit segment
+  }
+
+  try {
+    const sessionPath = latestSession(configDir, workspaceCwd);
+    if (!sessionPath) {
+      return ""; // No session exists for this directory
+    }
+
+    // Get file mtime
+    const stat = statSync(sessionPath);
+    const mtime = stat.mtime.getTime();
+    const now = Date.now();
+    const idleMinutes = Math.floor((now - mtime) / 1000 / 60);
+
+    // Calculate remaining time: 1h TTL = 60 minutes
+    const remainingMinutes = Math.max(0, 60 - idleMinutes);
+
+    if (remainingMinutes === 0) {
+      return " · cache cold";
+    }
+    return ` · cache ${remainingMinutes}m`;
+  } catch {
+    return ""; // Silently omit on error
+  }
 }
 
 /**
