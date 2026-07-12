@@ -19,20 +19,23 @@ interface CommandOptions {
 
 interface AuditEvent {
   type: "explicit" | "heuristic";
+  class: "switch" | "refresh" | "post-reset";
   sourceProfile: string;
   targetProfile: string;
   project: string;
   sourceContextTokens: number;
-  targetFirstTurnCacheCreation?: number;
+  targetFirstTurnCacheCreation?: number | undefined;
   naiveEstimate: number;
   handoffEstimate: number;
-  savedEstimate?: number;
+  savedEstimate?: number | undefined;
+  consumedAt?: string | undefined;
 }
 
 interface AuditOutput {
   events: AuditEvent[];
   totalEvents: number;
   totalEstimatedSaved: number;
+  byClass?: Record<string, { count: number; estimatedSaved: number }>;
 }
 
 /**
@@ -66,6 +69,16 @@ export async function audit(
     const events = await detectEvents(config, before);
 
     if (opts.json) {
+      // Compute per-class totals
+      const byClass: Record<string, { count: number; estimatedSaved: number }> = {};
+      for (const event of events) {
+        const cls = byClass[event.class] || { count: 0, estimatedSaved: 0 };
+        byClass[event.class] = {
+          count: cls.count + 1,
+          estimatedSaved: cls.estimatedSaved + (event.savedEstimate || 0),
+        };
+      }
+
       const output: AuditOutput = {
         events,
         totalEvents: events.length,
@@ -73,6 +86,7 @@ export async function audit(
           (sum, e) => sum + (e.savedEstimate || 0),
           0
         ),
+        byClass,
       };
       console.log(JSON.stringify(output, null, 2));
     } else {
@@ -168,6 +182,7 @@ async function detectEvents(
             consumedBy?: {
               profile?: string;
               sessionId?: string;
+              at?: string;
             };
             sourceProfile?: string;
             contextTokens?: number;
@@ -176,10 +191,19 @@ async function detectEvents(
           if (
             metaContent.consumed &&
             metaContent.consumedBy?.profile &&
-            metaContent.sourceProfile &&
-            metaContent.consumedBy.profile !== metaContent.sourceProfile
+            metaContent.sourceProfile
           ) {
-            const pairKey = `${metaContent.sourceProfile}→${metaContent.consumedBy.profile}/${projectMunged}`;
+            const sourceProfile = metaContent.sourceProfile;
+            const targetProfile = metaContent.consumedBy.profile;
+
+            // Determine class
+            let eventClass: "switch" | "refresh" | "post-reset" = "switch";
+            if (sourceProfile === targetProfile) {
+              // Same profile: this is now accepted as "refresh"
+              eventClass = "refresh";
+            }
+
+            const pairKey = `${sourceProfile}→${targetProfile}/${projectMunged}`;
             if (!seenHandoffPairs.has(pairKey)) {
               seenHandoffPairs.add(pairKey);
 
@@ -191,13 +215,15 @@ async function detectEvents(
 
               events.push({
                 type: "explicit",
-                sourceProfile: metaContent.sourceProfile,
-                targetProfile: metaContent.consumedBy.profile,
+                class: eventClass,
+                sourceProfile,
+                targetProfile,
                 project: projectMunged,
                 sourceContextTokens,
                 naiveEstimate,
                 handoffEstimate,
                 savedEstimate,
+                consumedAt: metaContent.consumedBy.at,
               });
             }
           }
@@ -210,7 +236,7 @@ async function detectEvents(
     }
   }
 
-  // Detector B: Heuristic boundary detection (same project, A ends → B starts <30min, different profiles)
+  // Detector B: Heuristic boundary detection (same project, A ends → B starts <30min, different profiles only)
   const projectToProfiles: Record<string, any[]> = {};
 
   for (const profileName of Object.keys(sessionsByProfileProject)) {
@@ -243,13 +269,13 @@ async function detectEvents(
       return aTs - bTs;
     });
 
-    // Look for pairs A→B within 30min
+    // Look for pairs A→B within 30min (only different profiles for heuristic)
     for (let i = 0; i < sessions.length - 1; i++) {
       const sessionA = sessions[i];
       const sessionB = sessions[i + 1];
 
       if (!sessionA || !sessionB || sessionA.profile === sessionB.profile) {
-        continue; // Same profile, not a switch
+        continue; // Same profile, skip heuristic (explicit only)
       }
 
       const lastTsA = sessionA.meta?.lastTs
@@ -278,6 +304,7 @@ async function detectEvents(
 
           events.push({
             type: "heuristic",
+            class: "switch", // Heuristic is always different profiles
             sourceProfile: sessionA.profile,
             targetProfile: sessionB.profile,
             project: projectMunged,
@@ -296,40 +323,48 @@ async function detectEvents(
 
 function renderText(events: AuditEvent[]): void {
   if (events.length === 0) {
-    console.log("No switch events found");
+    console.log("No handoff events found");
     return;
   }
 
-  console.log(`Found ${events.length} switch event(s):\n`);
+  console.log(`Found ${events.length} handoff event(s):\n`);
+
+  // Group by class
+  const byClass: Record<string, AuditEvent[]> = { switch: [], refresh: [], "post-reset": [] };
+  for (const event of events) {
+    byClass[event.class]?.push(event);
+  }
 
   let totalSaved = 0;
 
-  for (const event of events) {
-    console.log(
-      `${event.type.toUpperCase()} · ${event.sourceProfile} → ${event.targetProfile}`
-    );
-    console.log(
-      `  Project: ${event.project}`
-    );
-    console.log(
-      `  Context abandoned: ${event.sourceContextTokens} tokens`
-    );
-    console.log(
-      `  Naive switch: ~${event.naiveEstimate} tokens`
-    );
-    console.log(
-      `  Handoff path: ~${event.handoffEstimate} tokens`
-    );
-    if (event.savedEstimate) {
+  // Print grouped by class
+  const classOrder = ["switch", "refresh", "post-reset"] as const;
+  for (const className of classOrder) {
+    const classEvents = byClass[className] || [];
+    if (classEvents.length === 0) continue;
+
+    console.log(`${className.toUpperCase()} (${classEvents.length}):`);
+    let classSaved = 0;
+
+    for (const event of classEvents) {
       console.log(
-        `  Estimated saved: ~${event.savedEstimate} tokens`
+        `  ${event.sourceProfile} → ${event.targetProfile} [${event.project}]`
       );
-      totalSaved += event.savedEstimate;
+      console.log(
+        `    Context: ${event.sourceContextTokens} tokens | Naive: ~${event.naiveEstimate} | Handoff: ~${event.handoffEstimate}`
+      );
+      if (event.savedEstimate) {
+        console.log(
+          `    Saved: ~${event.savedEstimate} tokens`
+        );
+        classSaved += event.savedEstimate;
+        totalSaved += event.savedEstimate;
+      }
     }
-    console.log();
+    console.log(`  Class total: ~${classSaved} tokens\n`);
   }
 
-  console.log(`Totals: ${events.length} event(s), ~${totalSaved} tokens saved`);
+  console.log(`Totals: ${events.length} event(s), saved ≈ ${totalSaved} tokens`);
 }
 
 function parseDuration(str: string): number {

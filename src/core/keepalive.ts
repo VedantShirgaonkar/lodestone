@@ -168,14 +168,16 @@ export function killKeepaliveScheduler(
 }
 
 /**
- * Check if a profile's 5h window exceeds threshold (80% by default)
+ * Check if a profile's 5h window exceeds threshold (from config.keepalive.maxWindowPct, default 80)
  */
 export async function isFiveHourLimitReached(
   configDir: string,
   claudeVersion: string | undefined,
-  threshold: number = 80
+  overrideThreshold?: number
 ): Promise<boolean> {
   try {
+    const config = loadConfig();
+    const threshold = overrideThreshold ?? config.settings.keepalive?.maxWindowPct ?? 80;
     const quota = await getQuota(configDir, claudeVersion, false);
     const utilization = quota.fiveHourUtilization ?? 0;
     return utilization >= threshold;

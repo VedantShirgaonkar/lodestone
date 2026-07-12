@@ -15,6 +15,8 @@ import { config } from "./commands/config.js";
 import { dash } from "./commands/dash.js";
 import { keepalive } from "./commands/keepalive.js";
 import { audit } from "./commands/audit.js";
+import { trail } from "./commands/trail.js";
+import { refresh } from "./commands/refresh.js";
 
 const VERSION = "0.1.0";
 
@@ -34,6 +36,8 @@ const COMMAND_NAMES = new Set([
   "dash",
   "keepalive",
   "audit",
+  "trail",
+  "refresh",
   "help",
 ]);
 
@@ -146,6 +150,12 @@ export async function main(argv: string[]): Promise<number> {
 
       case "audit":
         return await audit(commandArgs2, cmdOpts);
+
+      case "trail":
+        return await trail(commandArgs2, cmdOpts);
+
+      case "refresh":
+        return await refresh(commandArgs2, cmdOpts);
 
       case "help": {
         const helpCmd = commandArgs2[0];

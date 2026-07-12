@@ -28,6 +28,38 @@ export function handoffDirFor(projectRoot: string): string {
 }
 
 /**
+ * Get the trail rules file path for a project root.
+ * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/rules/warmswap-trail.md`
+ */
+export function trailRulesPathFor(projectRoot: string): string {
+  return join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+}
+
+/**
+ * Get the trail skill file path for a project root.
+ * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/skills/trail/SKILL.md`
+ */
+export function trailSkillPathFor(projectRoot: string): string {
+  return join(projectRoot, ".claude", "skills", "trail", "SKILL.md");
+}
+
+/**
+ * Get the trail handoff file path for a project root.
+ * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/handoff/trail.md`
+ */
+export function trailHandoffPathFor(projectRoot: string): string {
+  return join(projectRoot, ".claude", "handoff", "trail.md");
+}
+
+/**
+ * Get the trail metadata file path for a project root.
+ * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/handoff/trail.meta.json`
+ */
+export function trailMetaPathFor(projectRoot: string): string {
+  return join(projectRoot, ".claude", "handoff", "trail.meta.json");
+}
+
+/**
  * Get the warmswap config path.
  * $XDG_CONFIG_HOME/warmswap/config.json, fallback to ~/.config/warmswap/config.json
  */

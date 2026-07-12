@@ -154,3 +154,60 @@ test("handoffFile: archive rotation keeps 20 files", () => {
   const files = readdirSync(archiveDir);
   assert.ok(files.length <= 20);
 });
+
+test("handoffFile: trail consume-once with revival on newer update", async () => {
+  const { freshest, markTrailConsumed } = await import("../src/core/handoffFile.js");
+  const { trailHandoffPathFor } = await import("../src/core/paths.js");
+  const { writeFileSync, utimesSync } = await import("node:fs");
+  const root = join(testDir, "trail-revive");
+  mkdirSync(join(root, ".claude", "handoff"), { recursive: true });
+
+  const trailPath = trailHandoffPathFor(root);
+  writeFileSync(trailPath, "# Trail\n## Goal\nship it\n", "utf8");
+
+  // Eligible before consumption, with trail origin
+  const first = freshest(root);
+  assert.ok(first, "fresh trail is returned");
+  assert.equal(first.origin, "trail");
+
+  // First consumption must WORK even though no meta file existed yet
+  markTrailConsumed(root, "personal", "sess-A");
+  const afterConsume = freshest(root);
+  assert.equal(afterConsume, undefined, "consumed trail must not re-inject");
+
+  // A newer trail update revives eligibility
+  const future = new Date(Date.now() + 5000);
+  utimesSync(trailPath, future, future);
+  const revived = freshest(root);
+  assert.ok(revived, "updated trail is eligible again");
+  assert.equal(revived.origin, "trail");
+});
+
+test("handoffFile: consumed autos are skipped, older unconsumed wins", async () => {
+  const { freshest, markAutoConsumed } = await import("../src/core/handoffFile.js");
+  const { writeFileSync, utimesSync } = await import("node:fs");
+  const root = join(testDir, "auto-skip");
+  const autoDir = join(root, ".claude", "handoff", "auto");
+  mkdirSync(autoDir, { recursive: true });
+
+  const older = join(autoDir, "old.md");
+  const newer = join(autoDir, "new.md");
+  writeFileSync(older, "# Handoff Snapshot\nolder\n", "utf8");
+  writeFileSync(newer, "# Handoff Snapshot\nnewer\n", "utf8");
+  const past = new Date(Date.now() - 60000);
+  utimesSync(older, past, past);
+
+  const pick1 = freshest(root);
+  assert.ok(pick1);
+  assert.equal(pick1.origin, "auto");
+  assert.ok(pick1.path.endsWith("new.md"), "newest auto wins first");
+
+  // Consume the newest (meta created on the fly) -> older unconsumed wins
+  markAutoConsumed(root, newer, "personal", "sess-B");
+  const pick2 = freshest(root);
+  assert.ok(pick2, "older unconsumed auto is still eligible");
+  assert.ok(pick2.path.endsWith("old.md"));
+
+  markAutoConsumed(root, older, "personal", "sess-B");
+  assert.equal(freshest(root), undefined, "all consumed -> nothing injects");
+});

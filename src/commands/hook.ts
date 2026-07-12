@@ -1,9 +1,9 @@
 import { stdin, stdout } from "node:process";
 import { parseArgs } from "node:util";
-import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { findProjectRoot, handoffDirFor, mungeCwd, projectsDirFor } from "../core/paths.js";
-import { freshest, markConsumed, estimateTokens } from "../core/handoffFile.js";
+import { freshest, markConsumed, markTrailConsumed, markAutoConsumed, estimateTokens } from "../core/handoffFile.js";
 import { loadConfig } from "../core/config.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { parseSession } from "../core/transcript.js";
@@ -34,7 +34,7 @@ interface HookSpecificOutput {
 
 interface HookOutput {
   hookSpecificOutput: HookSpecificOutput;
-  systemMessage: string;
+  systemMessage?: string;
 }
 
 export async function hook(args: string[]): Promise<number> {
@@ -153,21 +153,21 @@ async function hookSessionStart(input: unknown): Promise<number> {
       return 0;
     }
 
-    const { markdown, meta } = handoff;
+    const { markdown, meta, origin, path: handoffPath } = handoff;
 
-    // Check if consumed
-    if (meta.consumed) {
-      return 0;
-    }
+    // freshest() already filters consumed entries per-origin (including the
+    // revived-trail case, where meta.consumed is true but a newer trail
+    // version makes it eligible again) — do not re-check meta.consumed here.
 
-    // Check age against maxAgeDays config
+    // Age gate: trail freshness was already mtime-gated inside freshest();
+    // latest/auto metas carry an accurate created timestamp.
     const maxAgeDays = config.settings.maxAgeDays ?? 7;
     const created = new Date(meta.created);
     const now = new Date();
     const ageMs = now.getTime() - created.getTime();
     const ageDays = ageMs / (1000 * 60 * 60 * 24);
 
-    if (ageDays > maxAgeDays) {
+    if (origin !== "trail" && ageDays > maxAgeDays) {
       return 0;
     }
 
@@ -194,11 +194,18 @@ async function hookSessionStart(input: unknown): Promise<number> {
 
     stdout.write(JSON.stringify(output) + "\n");
 
-    // Mark consumed — attributed to the profile doing the consuming (the
-    // session that just started), not the one that wrote the handoff.
+    // Mark the ORIGIN store consumed — attributed to the consuming profile.
+    // Marking latest.meta.json for a trail/auto injection would let that
+    // trail/auto re-inject on every future session start.
     const consumer = resolveActingProfile()?.name ?? "unknown";
     const sessionStr = sessionId ?? "unknown";
-    markConsumed(projectRoot, consumer, sessionStr);
+    if (origin === "latest") {
+      markConsumed(projectRoot, consumer, sessionStr);
+    } else if (origin === "trail") {
+      markTrailConsumed(projectRoot, consumer, sessionStr);
+    } else {
+      markAutoConsumed(projectRoot, handoffPath, consumer, sessionStr);
+    }
 
     return 0;
   } catch (err) {
@@ -305,14 +312,15 @@ async function hookPreCompact(input: unknown): Promise<number> {
 interface UserPromptSubmitInput {
   session_id?: string;
   cwd?: string;
+  transcript_path?: string;
 }
 
 async function hookUserPromptSubmit(input: unknown): Promise<number> {
-  const deadline = Date.now() + 500; // 500ms budget
+  const deadline = Date.now() + 500; // 500ms budget (critical snapshot may exceed once)
 
   try {
     const typedInput = input as UserPromptSubmitInput;
-    const { session_id: sessionId, cwd } = typedInput;
+    const { session_id: sessionId, cwd, transcript_path: transcriptPath } = typedInput;
 
     if (!cwd) {
       return 0;
@@ -324,35 +332,55 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
       return 0;
     }
 
-    // Check deadline
-    if (Date.now() > deadline) {
-      return 0;
+    const config = loadConfig();
+    const sessionKey = sessionId || "unknown";
+    const advisorState = readAdvisorState(profile.configDir, sessionKey);
+
+    const messages: string[] = [];
+    const contexts: string[] = [];
+    let stateChanged = false;
+
+    // ── Trail staleness reminder (independent of quota) ──────────────────
+    // Only when trail mode is installed for this project.
+    try {
+      const projectRoot = findProjectRoot(cwd);
+      const rulesPath = join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+      if (existsSync(rulesPath)) {
+        const staleMinutes = config.settings.advisor?.trailStaleMinutes ?? 20;
+        const trailPath = join(projectRoot, ".claude", "handoff", "trail.md");
+        const trailMtime = existsSync(trailPath)
+          ? statSync(trailPath).mtime.getTime()
+          : 0; // 0 = never written
+        const staleMs = staleMinutes * 60 * 1000;
+        const isStale = Date.now() - trailMtime > staleMs;
+        // Remind once per trail version: again only after Claude updates it
+        // (new mtime) and it goes stale again.
+        const alreadyRemindedFor = advisorState.trailRemindMtime;
+        if (isStale && alreadyRemindedFor !== trailMtime) {
+          advisorState.trailRemindMtime = trailMtime;
+          stateChanged = true;
+          contexts.push(
+            trailMtime === 0
+              ? "(Trail mode is on but .claude/handoff/trail.md does not exist yet — create it now per the trail rules, then continue the task.)"
+              : "(The session trail at .claude/handoff/trail.md is stale — update its sections now per the trail rules, then continue the task.)"
+          );
+        }
+      }
+    } catch {
+      // never block on trail bookkeeping
     }
 
-    // Load config
-    const config = loadConfig();
-
+    // ── Quota thresholds ─────────────────────────────────────────────────
     const fiveHourThreshold = config.settings.advisor?.fiveHourPct ?? 85;
     const weeklyThreshold = config.settings.advisor?.weeklyPct ?? 90;
+    const criticalThreshold = config.settings.advisor?.criticalPct ?? 95;
 
-    // Get quota
     const quota = await getQuota(
       profile.configDir,
       undefined,
       config.settings.realUsage ?? false
     );
 
-    if (!quota.fiveHourUtilization && !quota.sevenDayUtilization) {
-      // No quota data
-      return 0;
-    }
-
-    // Check deadline
-    if (Date.now() > deadline) {
-      return 0;
-    }
-
-    // Determine if we've crossed a threshold
     let warningUtilization: number | undefined;
     let warningWindow: "5h" | "7d" | undefined;
 
@@ -370,38 +398,72 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
       warningWindow = "7d";
     }
 
-    if (!warningUtilization || !warningWindow) {
-      return 0;
+    if (warningUtilization !== undefined && warningWindow !== undefined) {
+      const currentBucket = Math.floor(warningUtilization / 5) * 5;
+      const lastBucket = advisorState[warningWindow];
+      const isNewBucket = lastBucket === undefined || currentBucket > lastBucket;
+
+      const isCritical = warningUtilization >= criticalThreshold;
+
+      if (isCritical && !advisorState.criticalSnapshotDone) {
+        // Wall imminent: bank a snapshot NOW so the wall can't catch us
+        // empty-handed, regardless of what the user does next. Reuses the
+        // session-end flow (2s budget, exit-0, respects autoSnapshot=false).
+        advisorState.criticalSnapshotDone = true;
+        stateChanged = true;
+        if (transcriptPath && config.settings.autoSnapshot !== false) {
+          await hookSessionEnd({
+            transcript_path: transcriptPath,
+            cwd,
+            session_id: sessionId,
+          });
+        }
+        messages.push(
+          `warmswap: ${warningWindow} window at ${warningUtilization}% — snapshot saved. ` +
+            `If the limit hits: after reset, start a fresh session here and it loads automatically. ` +
+            `Cross-account: warmswap switch <profile>.`
+        );
+        contexts.push(
+          "(A recovery snapshot was just saved. Claude may suggest /handoff for a higher-quality handoff while the session is still alive.)"
+        );
+      } else if (isNewBucket && !isCritical) {
+        advisorState[warningWindow] = currentBucket;
+        stateChanged = true;
+        messages.push(
+          `warmswap: ${warningWindow} window at ${warningUtilization}% — cache is warm. ` +
+            `Shedding bloat in place? use /compact (native). Crossing a boundary? /handoff then ` +
+            `warmswap switch <profile> or /clear to refresh here.`
+        );
+        contexts.push(
+          "(Claude may suggest running /handoff to write a high-quality handoff while cache is warm — for a same-account context refresh via /clear, or before switching accounts.)"
+        );
+      } else if (isNewBucket) {
+        // critical bucket repeat (snapshot already banked) — stay quiet
+        advisorState[warningWindow] = currentBucket;
+        stateChanged = true;
+      }
     }
 
-    // Check debounce state: warn only on new 5%-step bucket
-    const advisorState = readAdvisorState(profile.configDir, sessionId || "unknown");
-    const currentBucket = Math.floor(warningUtilization / 5) * 5;
-
-    const lastBucket = advisorState[warningWindow];
-    if (lastBucket !== undefined && lastBucket >= currentBucket) {
-      // Already warned at this level
-      return 0;
+    if (stateChanged) {
+      writeAdvisorState(profile.configDir, sessionKey, advisorState);
     }
 
-    // Update debounce state
-    advisorState[warningWindow] = currentBucket;
-    writeAdvisorState(profile.configDir, sessionId || "unknown", advisorState);
-
-    // Emit warning
-    const message =
-      `warmswap: ${warningWindow} window at ${warningUtilization}% — ` +
-      `cache is warm: /handoff now is cheap, then warmswap switch <other>`;
+    if (messages.length === 0 && contexts.length === 0) {
+      return 0;
+    }
 
     const output: HookOutput = {
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
-        additionalContext: `(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)`,
+        additionalContext: contexts.join("\n"),
       },
-      systemMessage: message,
     };
+    if (messages.length > 0) {
+      output.systemMessage = messages.join(" · ");
+    }
 
     stdout.write(JSON.stringify(output) + "\n");
+    void deadline; // budget is advisory; the critical branch may exceed once
     return 0;
   } catch (err) {
     logError(`hook user-prompt-submit: ${err instanceof Error ? err.message : String(err)}`);
@@ -412,10 +474,19 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
 /**
  * Read advisor debounce state for a session
  */
+interface AdvisorState {
+  "5h"?: number;
+  "7d"?: number;
+  /** trail.md mtime (ms) the staleness reminder was last issued for; 0 = missing file */
+  trailRemindMtime?: number;
+  /** critical-threshold snapshot already banked for this session */
+  criticalSnapshotDone?: boolean;
+}
+
 function readAdvisorState(
   configDir: string,
   sessionId: string
-): Record<string, number> {
+): AdvisorState {
   const statePath = advisorStatePath(configDir);
 
   if (!existsSync(statePath)) {
@@ -424,7 +495,7 @@ function readAdvisorState(
 
   try {
     const raw = readFileSync(statePath, "utf8");
-    const data = JSON.parse(raw) as Record<string, Record<string, number>>;
+    const data = JSON.parse(raw) as Record<string, AdvisorState>;
     return data[sessionId] ?? {};
   } catch {
     return {};
@@ -437,7 +508,7 @@ function readAdvisorState(
 function writeAdvisorState(
   configDir: string,
   sessionId: string,
-  state: Record<string, number>
+  state: AdvisorState
 ): void {
   const statePath = advisorStatePath(configDir);
   const stateDir = dirname(statePath);
@@ -445,7 +516,7 @@ function writeAdvisorState(
   try {
     mkdirSync(stateDir, { recursive: true });
 
-    let data: Record<string, Record<string, number>> = {};
+    let data: Record<string, AdvisorState> = {};
 
     // Read existing state
     if (existsSync(statePath)) {

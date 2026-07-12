@@ -10,6 +10,12 @@ export interface ProfileConfig {
 export interface AdvisorSettings {
   fiveHourPct?: number;
   weeklyPct?: number;
+  trailStaleMinutes?: number;
+  criticalPct?: number;
+}
+
+export interface KeepaliveSettings {
+  maxWindowPct?: number;
 }
 
 export interface SettingsConfig {
@@ -21,6 +27,7 @@ export interface SettingsConfig {
   weights?: Record<string, number>;
   realUsage?: boolean;
   advisor?: AdvisorSettings;
+  keepalive?: KeepaliveSettings;
 }
 
 export interface WarmswapConfig {

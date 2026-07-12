@@ -52,6 +52,12 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
     value = config.settings.advisor?.fiveHourPct ?? 85;
   } else if (key === "advisor.weeklyPct") {
     value = config.settings.advisor?.weeklyPct ?? 90;
+  } else if (key === "advisor.criticalPct") {
+    value = config.settings.advisor?.criticalPct ?? 95;
+  } else if (key === "advisor.trailStaleMinutes") {
+    value = config.settings.advisor?.trailStaleMinutes ?? 20;
+  } else if (key === "keepalive.maxWindowPct") {
+    value = config.settings.keepalive?.maxWindowPct ?? 80;
   } else if (key === "plan") {
     value = config.settings.plan ?? "pro";
   } else {
@@ -100,6 +106,36 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
         config.settings.advisor = {};
       }
       config.settings.advisor.weeklyPct = numValue;
+    } else if (key === "advisor.criticalPct") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1 || numValue > 100) {
+        console.error("warmswap config: criticalPct must be 1-100");
+        return 1;
+      }
+      if (!config.settings.advisor) {
+        config.settings.advisor = {};
+      }
+      config.settings.advisor.criticalPct = numValue;
+    } else if (key === "advisor.trailStaleMinutes") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1) {
+        console.error("warmswap config: trailStaleMinutes must be ≥1");
+        return 1;
+      }
+      if (!config.settings.advisor) {
+        config.settings.advisor = {};
+      }
+      config.settings.advisor.trailStaleMinutes = numValue;
+    } else if (key === "keepalive.maxWindowPct") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1 || numValue > 99) {
+        console.error("warmswap config: maxWindowPct must be 1-99");
+        return 1;
+      }
+      if (!config.settings.keepalive) {
+        config.settings.keepalive = {};
+      }
+      config.settings.keepalive.maxWindowPct = numValue;
     } else if (key === "plan") {
       const validPlans = ["pro", "max5", "max20", "team"];
       if (!validPlans.includes(value)) {

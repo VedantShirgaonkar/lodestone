@@ -53,7 +53,7 @@ test("audit: shows no events when no sessions exist", async () => {
   });
 
   assert.equal(code, 0, `Expected code 0 but got ${code}. stderr: ${stderr}, stdout: ${stdout}`);
-  assert.match(stdout, /No switch events found/);
+  assert.match(stdout, /No handoff events found/);
   await rm(testHome, { recursive: true, force: true });
 });
 
@@ -80,7 +80,7 @@ test("audit: accepts --since flag", async () => {
   );
 
   assert.equal(code, 0);
-  assert.match(stdout, /No switch events found/);
+  assert.match(stdout, /No handoff events found/);
   await rm(testHome, { recursive: true, force: true });
 });
 
@@ -108,11 +108,10 @@ test("audit: accepts --json flag", async () => {
 
   assert.equal(code, 0);
   const json = JSON.parse(stdout);
-  assert.deepEqual(json, {
-    events: [],
-    totalEvents: 0,
-    totalEstimatedSaved: 0,
-  });
+  assert.ok(json.events !== undefined);
+  assert.equal(json.totalEvents, 0);
+  assert.equal(json.totalEstimatedSaved, 0);
+  assert.ok(json.byClass !== undefined);
   await rm(testHome, { recursive: true, force: true });
 });
 
@@ -173,5 +172,34 @@ test("audit: parseDuration rejects invalid formats", async () => {
     assert.equal(code, 1, `should reject duration: ${duration}`);
   }
 
+  await rm(testHome, { recursive: true, force: true });
+});
+
+test("audit: --json includes class field and byClass summary", async () => {
+  const testHome = resolve(testDir, "home6");
+  const configDir = resolve(testHome, ".claude");
+  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(configDir, { recursive: true });
+  await writeFile(
+    resolve(testHome, ".config/warmswap/config.json"),
+    JSON.stringify({
+      schema: 1,
+      profiles: { personal: { configDir } },
+      settings: {},
+    })
+  );
+
+  const { stdout, code } = await runAudit(
+    ["--json"],
+    {
+      HOME: testHome,
+      XDG_CONFIG_HOME: resolve(testHome, ".config"),
+    }
+  );
+
+  assert.equal(code, 0);
+  const json = JSON.parse(stdout);
+  assert.ok(json.byClass !== undefined);
+  assert.ok(typeof json.byClass === "object");
   await rm(testHome, { recursive: true, force: true });
 });
