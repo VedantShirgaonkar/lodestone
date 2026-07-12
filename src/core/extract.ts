@@ -65,6 +65,13 @@ export function extractSnapshot(
         for (const todo of input.todos) {
           if (typeof todo === "string") {
             latestTodos.push(todo);
+          } else if (todo && typeof todo === "object") {
+            // Real TodoWrite items are {content, status, ...}
+            const t = todo as Record<string, unknown>;
+            if (typeof t.content === "string") {
+              const box = t.status === "completed" ? "[x]" : "[ ]";
+              latestTodos.push(`${box} ${t.content}`);
+            }
           }
         }
       }
@@ -86,7 +93,7 @@ export function extractSnapshot(
       toolUse.name === "Edit" ||
       toolUse.name === "NotebookEdit"
     ) {
-      const path = input?.path;
+      const path = input?.file_path ?? input?.path ?? input?.notebook_path;
       if (typeof path === "string") {
         editedFilesMap.set(path, (editedFilesMap.get(path) ?? 0) + 1);
       }

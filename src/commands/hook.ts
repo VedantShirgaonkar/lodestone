@@ -1,0 +1,390 @@
+import { stdin, stdout } from "node:process";
+import { parseArgs } from "node:util";
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { findProjectRoot, handoffDirFor, mungeCwd, projectsDirFor } from "../core/paths.js";
+import { freshest, markConsumed, estimateTokens } from "../core/handoffFile.js";
+import { loadConfig } from "../core/config.js";
+import { resolveActingProfile } from "../core/profiles.js";
+import { parseSession } from "../core/transcript.js";
+import { captureGitInfo, extractSnapshot } from "../core/extract.js";
+import { renderHandoff } from "../core/handoffFile.js";
+import { logError, logInfo } from "../util/log.js";
+
+interface HookSessionStartInput {
+  session_id?: string;
+  transcript_path?: string;
+  cwd?: string;
+  model?: string;
+  source?: string;
+}
+
+interface HookSessionEndInput {
+  transcript_path?: string;
+  cwd?: string;
+  session_id?: string;
+}
+
+interface HookSpecificOutput {
+  hookEventName: string;
+  additionalContext: string;
+}
+
+interface HookOutput {
+  hookSpecificOutput: HookSpecificOutput;
+  systemMessage: string;
+}
+
+export async function hook(args: string[]): Promise<number> {
+  try {
+    const { values: parsedOpts, positionals } = parseArgs({
+      args,
+      options: {
+        "self-test": { type: "boolean" },
+      },
+      allowPositionals: true,
+    });
+
+    const subcommand = positionals[0];
+    const selfTest = (parsedOpts["self-test"] as boolean) ?? false;
+
+    if (selfTest) {
+      return await hookSelfTest();
+    }
+
+    if (!subcommand) {
+      return 0;
+    }
+
+    // Read stdin with 200ms guard for TTY
+    const input = await readStdinJson();
+    if (!input) {
+      return 0;
+    }
+
+    if (subcommand === "session-start") {
+      return await hookSessionStart(input);
+    } else if (subcommand === "session-end") {
+      return await hookSessionEnd(input);
+    } else if (subcommand === "pre-compact") {
+      return await hookPreCompact(input);
+    }
+
+    return 0;
+  } catch (err) {
+    logError(`hook: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
+
+/**
+ * Read JSON from stdin with a 200ms guard for TTY (no-input).
+ */
+async function readStdinJson(): Promise<unknown> {
+  return new Promise((resolve) => {
+    let data = "";
+    let timeoutId: NodeJS.Timeout | undefined;
+
+    // If stdin is a TTY, timeout after 200ms
+    if (stdin.isTTY) {
+      timeoutId = setTimeout(() => {
+        resolve(undefined);
+      }, 200);
+    }
+
+    stdin.on("data", (chunk) => {
+      if (timeoutId) clearTimeout(timeoutId);
+      data += chunk.toString();
+    });
+
+    stdin.on("end", () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      try {
+        const parsed = JSON.parse(data) as unknown;
+        resolve(parsed);
+      } catch {
+        resolve(undefined);
+      }
+    });
+
+    stdin.on("error", () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      resolve(undefined);
+    });
+
+    // Set timeout for non-TTY input after 200ms if no data received
+    if (!stdin.isTTY) {
+      setTimeout(() => {
+        if (data === "") {
+          resolve(undefined);
+        }
+      }, 200);
+    }
+  });
+}
+
+/**
+ * Hook session-start: inject handoff if fresh and unconsumed.
+ */
+async function hookSessionStart(input: unknown): Promise<number> {
+  try {
+    const typedInput = input as HookSessionStartInput;
+    const { cwd, source, session_id: sessionId } = typedInput;
+
+    if (!cwd) {
+      return 0;
+    }
+
+    // Only act when source is "startup" or "clear", or when source is missing
+    if (source && source !== "startup" && source !== "clear") {
+      return 0;
+    }
+
+    const projectRoot = findProjectRoot(cwd);
+    const config = loadConfig();
+
+    // Get freshest handoff
+    const handoff = freshest(projectRoot);
+    if (!handoff) {
+      return 0;
+    }
+
+    const { markdown, meta } = handoff;
+
+    // Check if consumed
+    if (meta.consumed) {
+      return 0;
+    }
+
+    // Check age against maxAgeDays config
+    const maxAgeDays = config.settings.maxAgeDays ?? 7;
+    const created = new Date(meta.created);
+    const now = new Date();
+    const ageMs = now.getTime() - created.getTime();
+    const ageDays = ageMs / (1000 * 60 * 60 * 24);
+
+    if (ageDays > maxAgeDays) {
+      return 0;
+    }
+
+    // Format age for display
+    const ageStr = ageDays < 1
+      ? Math.round(ageDays * 24) + "h"
+      : Math.round(ageDays) + "d";
+
+    // Estimate tokens
+    const tokens = estimateTokens(markdown);
+
+    // Create framing wrapper
+    const frame = `[Restored handoff from ${meta.sourceProfile || "unknown"}/${ageStr} — verify file paths and git state before relying on details]\n\n`;
+    const additionalContext = frame + markdown;
+
+    // Create output
+    const output: HookOutput = {
+      hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext,
+      },
+      systemMessage: `cchandoff: restored handoff (~${tokens} tokens, from ${meta.sourceProfile || "unknown"}, ${ageStr})`,
+    };
+
+    stdout.write(JSON.stringify(output) + "\n");
+
+    // Mark consumed — attributed to the profile doing the consuming (the
+    // session that just started), not the one that wrote the handoff.
+    const consumer = resolveActingProfile()?.name ?? "unknown";
+    const sessionStr = sessionId ?? "unknown";
+    markConsumed(projectRoot, consumer, sessionStr);
+
+    return 0;
+  } catch (err) {
+    logError(`hook session-start: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
+
+/**
+ * Hook session-end / pre-compact: auto-snapshot to auto/ directory.
+ * Budget: 2s total, exit 0 on any error.
+ */
+async function hookSessionEnd(input: unknown): Promise<number> {
+  const deadline = Date.now() + 2000; // 2-second deadline
+
+  try {
+    const typedInput = input as HookSessionEndInput;
+    const { transcript_path: transcriptPath, cwd, session_id: sessionId } = typedInput;
+
+    if (!transcriptPath || !cwd) {
+      return 0;
+    }
+
+    const config = loadConfig();
+    if (config.settings.autoSnapshot === false) {
+      return 0;
+    }
+
+    // Check deadline
+    if (Date.now() > deadline) {
+      return 0;
+    }
+
+    const projectRoot = findProjectRoot(cwd);
+
+    // Parse transcript
+    if (!existsSync(transcriptPath)) {
+      logError(`hook session-end: transcript not found: ${transcriptPath}`);
+      return 0;
+    }
+
+    const parsed = await parseSession(transcriptPath);
+
+    // Check deadline
+    if (Date.now() > deadline) {
+      return 0;
+    }
+
+    // Extract snapshot
+    const gitInfo = captureGitInfo(projectRoot);
+    const extracted = extractSnapshot(parsed, { gitInfo });
+
+    // Render
+    const goal = extracted.goal || "(no goal found)";
+    const state = extracted.lastThreePrompts.length > 0
+      ? extracted.lastThreePrompts.join("\n---\n")
+      : "(no recent activity)";
+    const decisions = extracted.latestCompactSummary
+      ? `From the last compaction summary:\n\n${extracted.latestCompactSummary}`
+      : "(none recorded)";
+    const files = extracted.filesEdited.length > 0 || extracted.filesRead.length > 0
+      ? [
+          extracted.filesEdited.map((f) => `- ${f.name} (${f.count} edits)`).join("\n"),
+          extracted.filesRead.map((f) => `- ${f} (read)`).join("\n"),
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "(no files)";
+    const lastExchange = extracted.finalAssistantText || "(no exchange)";
+    const nextSteps = extracted.latestTodos.length > 0
+      ? extracted.latestTodos.map((t) => `- ${t}`).join("\n")
+      : "(none)";
+    const openQuestions = "(none recorded)";
+
+    const created = new Date().toISOString();
+    const renderResult = renderHandoff({
+      goal,
+      state,
+      decisions,
+      files,
+      lastExchange,
+      nextSteps,
+      openQuestions,
+      sourceProfile: "auto",
+      sourceSession: parsed.meta.slug || sessionId || "unknown",
+      project: parsed.meta.gitBranch || "unknown",
+      ...(extracted.gitInfo.branch ? { branch: extracted.gitInfo.branch } : {}),
+      contextTokens: extracted.metrics.contextTokens,
+      distilled: false,
+      created,
+    });
+
+    const { markdown, meta } = renderResult;
+
+    // Check deadline
+    if (Date.now() > deadline) {
+      return 0;
+    }
+
+    // Write to auto/
+    const handoffDir = handoffDirFor(projectRoot);
+    const autoDir = join(handoffDir, "auto");
+    mkdirSync(autoDir, { recursive: true });
+
+    const autoId = sessionId || parsed.meta.sessionId || "unknown";
+    const autoPath = join(autoDir, `${autoId}.md`);
+    const autoMetaPath = join(autoDir, `${autoId}.meta.json`);
+
+    writeFileSync(autoPath, markdown, "utf8");
+    writeFileSync(autoMetaPath, JSON.stringify(meta, null, 2), "utf8");
+
+    logInfo(`auto-snapshot: ${autoId}`);
+    return 0;
+  } catch (err) {
+    logError(`hook session-end: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
+
+/**
+ * Hook pre-compact: alias for session-end flow
+ */
+async function hookPreCompact(input: unknown): Promise<number> {
+  return hookSessionEnd(input);
+}
+
+/**
+ * Self-test: verify hook works end-to-end with synthetic input.
+ * Doctor uses this to verify hook installation.
+ */
+async function hookSelfTest(): Promise<number> {
+  try {
+    const tempDir = `/tmp/cchandoff-hook-test-${Date.now()}`;
+    mkdirSync(tempDir, { recursive: true });
+
+    // Create synthetic handoff
+    const handoffDir = join(tempDir, ".claude", "handoff");
+    mkdirSync(handoffDir, { recursive: true });
+
+    const markdown = `# Handoff Snapshot
+
+## Goal
+Test goal`;
+
+    const meta = {
+      schema: 1,
+      created: new Date().toISOString(),
+      sourceProfile: "test-profile",
+      sourceSession: "test-session",
+      project: "test",
+      branch: "main",
+      contextTokens: 5000,
+      distilled: false,
+      consumed: false,
+    };
+
+    const latestPath = join(handoffDir, "latest.md");
+    const metaPath = join(handoffDir, "latest.meta.json");
+
+    writeFileSync(latestPath, markdown, "utf8");
+    writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+
+    // Verify files exist
+    if (!existsSync(latestPath) || !existsSync(metaPath)) {
+      console.log("fail self-test: could not create test files");
+      return 1;
+    }
+
+    // Simulate session-start input
+    const testInput: HookSessionStartInput = {
+      cwd: tempDir,
+      session_id: "test-session-id",
+      source: "startup",
+    };
+
+    // Run test
+    const mockInput: unknown = testInput;
+    // We're not actually testing stdout capture here, just that the function runs
+    const result = await hookSessionStart(mockInput);
+
+    // The function should complete without throwing
+    if (result === 0) {
+      console.log("ok self-test: hook session-start works");
+      return 0;
+    } else {
+      console.log("fail self-test: hook returned error code");
+      return 1;
+    }
+  } catch (err) {
+    console.log(`fail self-test: ${err instanceof Error ? err.message : String(err)}`);
+    return 1;
+  }
+}

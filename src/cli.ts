@@ -1,4 +1,5 @@
 import { stderr } from "node:process";
+import { pathToFileURL } from "node:url";
 import { profile } from "./commands/profile.js";
 import { launch } from "./commands/launch.js";
 import { login } from "./commands/login.js";
@@ -7,6 +8,9 @@ import { handoff } from "./commands/handoff.js";
 import { switchCmd } from "./commands/switch.js";
 import { status } from "./commands/status.js";
 import { doctor } from "./commands/doctor.js";
+import { hook } from "./commands/hook.js";
+import { statusline } from "./commands/statusline.js";
+import { init } from "./commands/init.js";
 
 const VERSION = "0.1.0";
 
@@ -19,6 +23,9 @@ const COMMAND_NAMES = new Set([
   "switch",
   "status",
   "doctor",
+  "hook",
+  "statusline",
+  "init",
   "help",
 ]);
 
@@ -108,6 +115,15 @@ export async function main(argv: string[]): Promise<number> {
 
       case "doctor":
         return await doctor(commandArgs2, cmdOpts);
+
+      case "hook":
+        return await hook(commandArgs2);
+
+      case "statusline":
+        return await statusline();
+
+      case "init":
+        return await init(commandArgs2, cmdOpts);
 
       case "help": {
         const helpCmd = commandArgs2[0];
@@ -213,7 +229,13 @@ Commands:
   switch               Switch to a profile with handoff
   status               Show profile burn and session status
   doctor               Diagnose setup issues
-  help                 Show command help`);
+  init                 Initialize hooks and config
+
+Internal:
+  hook                 (internal: session lifecycle hooks)
+  statusline           (internal: status line renderer)
+
+help                   Show command help`);
 }
 
 function printCommandHelp(command: string): void {
@@ -262,4 +284,18 @@ Usage: cchandoff doctor`,
 
 function printError(message: string): void {
   stderr.write(`cchandoff: ${message}\n`);
+}
+
+// Self-execute when run directly (`node dist/cli.js …`), not just via bin shim.
+// Without this, direct invocation is a silent no-op — a footgun that has
+// already produced misleading "it exited 0" test results twice.
+const directPath = process.argv[1];
+if (directPath && import.meta.url === pathToFileURL(directPath).href) {
+  main(process.argv.slice(2)).then(
+    (code) => process.exit(code ?? 0),
+    (err) => {
+      printError(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+  );
 }

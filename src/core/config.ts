@@ -12,6 +12,7 @@ export interface SettingsConfig {
   injectOn?: string[];
   autoSnapshot?: boolean;
   distillModel?: string;
+  plan?: string; // "pro" | "max5" | "max20" | "team"
   weights?: Record<string, number>;
 }
 
