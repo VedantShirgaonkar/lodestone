@@ -12,6 +12,9 @@ import { hook } from "./commands/hook.js";
 import { statusline } from "./commands/statusline.js";
 import { init } from "./commands/init.js";
 import { config } from "./commands/config.js";
+import { dash } from "./commands/dash.js";
+import { keepalive } from "./commands/keepalive.js";
+import { audit } from "./commands/audit.js";
 
 const VERSION = "0.1.0";
 
@@ -28,6 +31,9 @@ const COMMAND_NAMES = new Set([
   "statusline",
   "init",
   "config",
+  "dash",
+  "keepalive",
+  "audit",
   "help",
 ]);
 
@@ -131,6 +137,15 @@ export async function main(argv: string[]): Promise<number> {
 
       case "config":
         return await config(commandArgs2, cmdOpts);
+
+      case "dash":
+        return await dash(commandArgs2, cmdOpts);
+
+      case "keepalive":
+        return await keepalive(commandArgs2, cmdOpts);
+
+      case "audit":
+        return await audit(commandArgs2, cmdOpts);
 
       case "help": {
         const helpCmd = commandArgs2[0];
@@ -236,6 +251,9 @@ Commands:
   switch               Switch to a profile with handoff
   status               Show profile burn and session status
   doctor               Diagnose setup issues
+  dash                 Live TUI dashboard
+  keepalive            Keep session warm with TTL refresh pings
+  audit                Analyze handoff and switch events
   init                 Initialize hooks and config
 
 Internal:
@@ -284,6 +302,33 @@ Usage: cchandoff status [--json]`,
     doctor: `cchandoff doctor — diagnose setup issues
 
 Usage: cchandoff doctor`,
+
+    dash: `cchandoff dash — live TUI dashboard
+
+Usage: cchandoff dash [--once]
+
+Options:
+  --once               Render one frame and exit (for testing)`,
+
+    keepalive: `cchandoff keepalive — keep session warm with TTL refresh pings
+
+Usage: cchandoff keepalive <profile> [--for <duration>] [--max-pings <n>]
+       cchandoff keepalive --stop [<profile>]
+       cchandoff keepalive --status
+
+Options:
+  --for <duration>     Duration (e.g. 90m, 2h) — default 90m
+  --max-pings <n>      Max pings to send — default 3
+  --stop [<profile>]   Stop keepalive (all if no profile)
+  --status             Show active keepalive schedulers`,
+
+    audit: `cchandoff audit — analyze handoff and switch events
+
+Usage: cchandoff audit [--since <duration>] [--json]
+
+Options:
+  --since <duration>   Look back (e.g. 7d, 24h) — default 7d
+  --json               Machine output`,
   };
 
   console.log(helps[command] || `Unknown command: ${command}`);
