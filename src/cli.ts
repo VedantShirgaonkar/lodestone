@@ -11,6 +11,7 @@ import { doctor } from "./commands/doctor.js";
 import { hook } from "./commands/hook.js";
 import { statusline } from "./commands/statusline.js";
 import { init } from "./commands/init.js";
+import { config } from "./commands/config.js";
 
 const VERSION = "0.1.0";
 
@@ -26,6 +27,7 @@ const COMMAND_NAMES = new Set([
   "hook",
   "statusline",
   "init",
+  "config",
   "help",
 ]);
 
@@ -85,10 +87,12 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     // Route to command handler
-    const cmdOpts = {
+    const cmdOpts: { json: boolean; profile?: string } = {
       json,
-      profile: profileFlag ?? undefined,
     };
+    if (profileFlag !== undefined) {
+      cmdOpts.profile = profileFlag;
+    }
     const commandArgs2 = effectiveArgs;
 
     switch (command) {
@@ -124,6 +128,9 @@ export async function main(argv: string[]): Promise<number> {
 
       case "init":
         return await init(commandArgs2, cmdOpts);
+
+      case "config":
+        return await config(commandArgs2, cmdOpts);
 
       case "help": {
         const helpCmd = commandArgs2[0];

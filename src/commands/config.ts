@@ -1,0 +1,133 @@
+import { parseArgs } from "node:util";
+import { loadConfig, saveConfig } from "../core/config.js";
+import { cchandoffConfigPath } from "../core/paths.js";
+
+interface CommandOptions {
+  json: boolean;
+  profile?: string;
+}
+
+export async function config(args: string[], opts: CommandOptions): Promise<number> {
+  try {
+    const { positionals } = parseArgs({
+      args,
+      allowPositionals: true,
+      strict: false,
+    });
+
+    const subcommand = positionals[0];
+    const key = positionals[1];
+    const value = positionals[2];
+
+    if (subcommand === "get") {
+      return configGet(key, opts);
+    } else if (subcommand === "set") {
+      return configSet(key, value, opts);
+    } else {
+      console.error("cchandoff config: usage: config get|set <key> [value]");
+      console.error(
+        "  keys: realUsage, advisor.fiveHourPct, advisor.weeklyPct, plan"
+      );
+      return 2;
+    }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`cchandoff config: ${msg}`);
+    return 1;
+  }
+}
+
+function configGet(key: string | undefined, opts: CommandOptions): number {
+  if (!key) {
+    console.error("cchandoff config get: missing key");
+    return 2;
+  }
+
+  const config = loadConfig();
+  let value: unknown;
+
+  if (key === "realUsage") {
+    value = config.settings.realUsage ?? false;
+  } else if (key === "advisor.fiveHourPct") {
+    value = config.settings.advisor?.fiveHourPct ?? 85;
+  } else if (key === "advisor.weeklyPct") {
+    value = config.settings.advisor?.weeklyPct ?? 90;
+  } else if (key === "plan") {
+    value = config.settings.plan ?? "pro";
+  } else {
+    console.error(`cchandoff config: unknown key: ${key}`);
+    return 1;
+  }
+
+  if (opts.json) {
+    console.log(JSON.stringify({ key, value }));
+  } else {
+    console.log(`${key}: ${value}`);
+  }
+
+  return 0;
+}
+
+function configSet(key: string | undefined, value: string | undefined, opts: CommandOptions): number {
+  if (!key || !value) {
+    console.error("cchandoff config set: missing key or value");
+    return 2;
+  }
+
+  const config = loadConfig();
+
+  try {
+    if (key === "realUsage") {
+      const boolValue = value.toLowerCase() === "true" || value === "1";
+      config.settings.realUsage = boolValue;
+    } else if (key === "advisor.fiveHourPct") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+        console.error("cchandoff config: fiveHourPct must be 0-100");
+        return 1;
+      }
+      if (!config.settings.advisor) {
+        config.settings.advisor = {};
+      }
+      config.settings.advisor.fiveHourPct = numValue;
+    } else if (key === "advisor.weeklyPct") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+        console.error("cchandoff config: weeklyPct must be 0-100");
+        return 1;
+      }
+      if (!config.settings.advisor) {
+        config.settings.advisor = {};
+      }
+      config.settings.advisor.weeklyPct = numValue;
+    } else if (key === "plan") {
+      const validPlans = ["pro", "max5", "max20", "team"];
+      if (!validPlans.includes(value)) {
+        console.error(
+          `cchandoff config: plan must be one of: ${validPlans.join(", ")}`
+        );
+        return 1;
+      }
+      config.settings.plan = value;
+    } else {
+      console.error(`cchandoff config: unknown key: ${key}`);
+      return 1;
+    }
+
+    saveConfig(config);
+
+    const configPath = cchandoffConfigPath();
+    if (opts.json) {
+      console.log(JSON.stringify({ key, value, configPath }));
+    } else {
+      console.log(`${key} = ${value}`);
+      console.log(`config: ${configPath}`);
+    }
+
+    return 0;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`cchandoff config: ${msg}`);
+    return 1;
+  }
+}

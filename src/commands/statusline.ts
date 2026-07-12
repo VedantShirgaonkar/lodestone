@@ -6,6 +6,13 @@ import { latestContextTokens, parseSession } from "../core/transcript.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { windowBurn } from "../core/usage.js";
 import { loadConfig } from "../core/config.js";
+import { writeUsageCache } from "../core/realUsage.js";
+
+interface RateLimitsSegment {
+  used_percentage?: number;
+  utilization?: number;
+  resets_at?: number;
+}
 
 interface StatuslineInput {
   session_id?: string;
@@ -23,6 +30,10 @@ interface StatuslineInput {
     token_counts?: Record<string, number>;
     exceeds_200k_tokens?: boolean;
     current_usage?: number;
+  };
+  rate_limits?: {
+    five_hour?: RateLimitsSegment;
+    seven_day?: RateLimitsSegment;
   };
 }
 
@@ -63,29 +74,110 @@ export async function statusline(): Promise<number> {
 
     const typedInput = input as StatuslineInput;
 
-    // Build output line
+    // Build output line (v2: prefer rate_limits, add weekly, pacing, advisor glyph)
     const profile = resolveActingProfile()?.name ?? "?";
     const contextPctStr = typedInput.context_window?.used_percentage
       ? ` · ctx ${typedInput.context_window.used_percentage}%`
       : "";
 
-    // Calculate window burn (skip if projects dir has >400 jsonl files)
-    let windowBurnStr = "";
-    const currentProfile = resolveActingProfile();
-    if (currentProfile) {
-      const projectsDir = projectsDirFor(currentProfile.configDir);
-      const hasManySessions = projectsHasManySessions(projectsDir);
+    // Real rate_limits take priority over estimate
+    let fiveHourStr = "";
+    let weeklyStr = "";
+    let pacingMarker = "";
+    let advisorGlyph = "";
 
-      if (!hasManySessions) {
-        try {
-          const burnResult = await windowBurn(currentProfile.configDir, new Date());
-          const burnPct = Math.round((burnResult.burn / 200000) * 100); // Default pro budget
-          windowBurnStr = ` · 5h ≈${burnPct}%`;
-        } catch {
-          windowBurnStr = " · 5h ?%";
+    const currentProfile = resolveActingProfile();
+
+    if (typedInput.rate_limits) {
+      // Write to usage cache for other tools
+      if (currentProfile) {
+        const cacheData: {
+          source: "statusline" | "oauth";
+          five_hour?: { used_percentage?: number | undefined; resets_at_ts?: number | undefined } | undefined;
+          seven_day?: { used_percentage?: number | undefined; resets_at_ts?: number | undefined } | undefined;
+        } = {
+          source: "statusline",
+        };
+
+        if (typedInput.rate_limits.five_hour) {
+          cacheData.five_hour = {
+            used_percentage: typedInput.rate_limits.five_hour.used_percentage,
+            resets_at_ts: typedInput.rate_limits.five_hour.resets_at,
+          };
         }
-      } else {
-        windowBurnStr = " · 5h ?%";
+
+        if (typedInput.rate_limits.seven_day) {
+          cacheData.seven_day = {
+            used_percentage: typedInput.rate_limits.seven_day.used_percentage,
+            resets_at_ts: typedInput.rate_limits.seven_day.resets_at,
+          };
+        }
+
+        writeUsageCache(currentProfile.configDir, cacheData);
+      }
+
+      // 5h segment with pacing
+      const fiveHourPct = typedInput.rate_limits.five_hour?.used_percentage;
+      if (fiveHourPct !== undefined) {
+        // Calculate pacing target: elapsed / window_length
+        // For now, show if we're above target (>50% at 2.5h = 50% of window)
+        const isPacing =
+          fiveHourPct > 50 ? "▲" + Math.min(fiveHourPct, 99) : "";
+        fiveHourStr = ` · 5h ${fiveHourPct}%${isPacing}`;
+
+        // Show countdown to reset if present
+        if (typedInput.rate_limits.five_hour?.resets_at) {
+          const resetEpoch = typedInput.rate_limits.five_hour.resets_at;
+          const nowEpoch = Math.floor(Date.now() / 1000);
+          const minutesRemaining = Math.max(
+            0,
+            Math.round((resetEpoch - nowEpoch) / 60)
+          );
+          if (minutesRemaining > 0 && minutesRemaining < 300) {
+            // Only show if <5h
+            fiveHourStr += ` (${formatDuration(minutesRemaining * 60)})`;
+          }
+        }
+
+        // Advisor glyph: warn at threshold
+        const config = loadConfig();
+        const advisorThreshold = config.settings.advisor?.fiveHourPct ?? 85;
+        if (fiveHourPct >= advisorThreshold) {
+          advisorGlyph = " ⚠ handoff?";
+        }
+      }
+
+      // 7d segment
+      const weeklyPct = typedInput.rate_limits.seven_day?.used_percentage;
+      if (weeklyPct !== undefined) {
+        weeklyStr = ` · wk ${weeklyPct}%`;
+
+        // Check weekly threshold for advisor
+        if (!advisorGlyph) {
+          const config = loadConfig();
+          const weeklyThreshold = config.settings.advisor?.weeklyPct ?? 90;
+          if (weeklyPct >= weeklyThreshold) {
+            advisorGlyph = " ⚠ handoff?";
+          }
+        }
+      }
+    } else {
+      // Fallback: estimate from window burn (skip if >400 jsonl files)
+      if (currentProfile) {
+        const projectsDir = projectsDirFor(currentProfile.configDir);
+        const hasManySessions = projectsHasManySessions(projectsDir);
+
+        if (!hasManySessions) {
+          try {
+            const burnResult = await windowBurn(currentProfile.configDir, new Date());
+            const burnPct = Math.round((burnResult.burn / 200000) * 100); // Default pro budget
+            fiveHourStr = ` · 5h ≈${burnPct}%`;
+          } catch {
+            fiveHourStr = " · 5h ?%";
+          }
+        } else {
+          fiveHourStr = " · 5h ?%";
+        }
       }
     }
 
@@ -105,13 +197,28 @@ export async function statusline(): Promise<number> {
       }
     }
 
-    const line = `⇄ ${profile}${contextPctStr}${windowBurnStr}${switchTaxStr}`;
+    const line =
+      `⇄ ${profile}${contextPctStr}${fiveHourStr}${weeklyStr}${switchTaxStr}${advisorGlyph}`;
     console.log(line);
     return 0;
   } catch {
     console.log("⇄ cchandoff");
     return 0;
   }
+}
+
+/**
+ * Format duration in seconds as human-readable string
+ */
+function formatDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+
+  if (hours > 0) {
+    return `${hours}h${mins > 0 ? mins + "m" : ""}`;
+  }
+  return `${mins}m`;
 }
 
 /**

@@ -1,14 +1,16 @@
 import { stdin, stdout } from "node:process";
 import { parseArgs } from "node:util";
-import { readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync } from "node:fs";
+import { join, dirname } from "node:path";
 import { findProjectRoot, handoffDirFor, mungeCwd, projectsDirFor } from "../core/paths.js";
 import { freshest, markConsumed, estimateTokens } from "../core/handoffFile.js";
 import { loadConfig } from "../core/config.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { parseSession } from "../core/transcript.js";
 import { captureGitInfo, extractSnapshot } from "../core/extract.js";
-import { renderHandoff } from "../core/handoffFile.js";
+import { composeHandoff } from "../core/composeHandoff.js";
+import { saveHandoff } from "../core/handoffFile.js";
+import { getQuota, advisorStatePath } from "../core/realUsage.js";
 import { logError, logInfo } from "../util/log.js";
 
 interface HookSessionStartInput {
@@ -68,6 +70,8 @@ export async function hook(args: string[]): Promise<number> {
       return await hookSessionEnd(input);
     } else if (subcommand === "pre-compact") {
       return await hookPreCompact(input);
+    } else if (subcommand === "user-prompt-submit") {
+      return await hookUserPromptSubmit(input);
     }
 
     return 0;
@@ -247,47 +251,19 @@ async function hookSessionEnd(input: unknown): Promise<number> {
     const gitInfo = captureGitInfo(projectRoot);
     const extracted = extractSnapshot(parsed, { gitInfo });
 
-    // Render
-    const goal = extracted.goal || "(no goal found)";
-    const state = extracted.lastThreePrompts.length > 0
-      ? extracted.lastThreePrompts.join("\n---\n")
-      : "(no recent activity)";
-    const decisions = extracted.latestCompactSummary
-      ? `From the last compaction summary:\n\n${extracted.latestCompactSummary}`
-      : "(none recorded)";
-    const files = extracted.filesEdited.length > 0 || extracted.filesRead.length > 0
-      ? [
-          extracted.filesEdited.map((f) => `- ${f.name} (${f.count} edits)`).join("\n"),
-          extracted.filesRead.map((f) => `- ${f} (read)`).join("\n"),
-        ]
-          .filter(Boolean)
-          .join("\n")
-      : "(no files)";
-    const lastExchange = extracted.finalAssistantText || "(no exchange)";
-    const nextSteps = extracted.latestTodos.length > 0
-      ? extracted.latestTodos.map((t) => `- ${t}`).join("\n")
-      : "(none)";
-    const openQuestions = "(none recorded)";
-
+    // Compose handoff
     const created = new Date().toISOString();
-    const renderResult = renderHandoff({
-      goal,
-      state,
-      decisions,
-      files,
-      lastExchange,
-      nextSteps,
-      openQuestions,
+    const composed = composeHandoff(extracted, {
       sourceProfile: "auto",
       sourceSession: parsed.meta.slug || sessionId || "unknown",
       project: parsed.meta.gitBranch || "unknown",
-      ...(extracted.gitInfo.branch ? { branch: extracted.gitInfo.branch } : {}),
+      branch: extracted.gitInfo.branch || undefined,
       contextTokens: extracted.metrics.contextTokens,
       distilled: false,
       created,
     });
 
-    const { markdown, meta } = renderResult;
+    const { markdown, meta } = composed;
 
     // Check deadline
     if (Date.now() > deadline) {
@@ -319,6 +295,178 @@ async function hookSessionEnd(input: unknown): Promise<number> {
  */
 async function hookPreCompact(input: unknown): Promise<number> {
   return hookSessionEnd(input);
+}
+
+/**
+ * Hook user-prompt-submit: advisor hook to warn when quota thresholds are crossed.
+ * Reads quota via bridge cache or OAuth (opt-in); thresholds from settings.advisor.
+ * Debounces: warns once per 5%-step per session (state file).
+ */
+interface UserPromptSubmitInput {
+  session_id?: string;
+  cwd?: string;
+}
+
+async function hookUserPromptSubmit(input: unknown): Promise<number> {
+  const deadline = Date.now() + 500; // 500ms budget
+
+  try {
+    const typedInput = input as UserPromptSubmitInput;
+    const { session_id: sessionId, cwd } = typedInput;
+
+    if (!cwd) {
+      return 0;
+    }
+
+    // Resolve profile
+    const profile = resolveActingProfile();
+    if (!profile) {
+      return 0;
+    }
+
+    // Check deadline
+    if (Date.now() > deadline) {
+      return 0;
+    }
+
+    // Load config
+    const config = loadConfig();
+
+    const fiveHourThreshold = config.settings.advisor?.fiveHourPct ?? 85;
+    const weeklyThreshold = config.settings.advisor?.weeklyPct ?? 90;
+
+    // Get quota
+    const quota = await getQuota(
+      profile.configDir,
+      undefined,
+      config.settings.realUsage ?? false
+    );
+
+    if (!quota.fiveHourUtilization && !quota.sevenDayUtilization) {
+      // No quota data
+      return 0;
+    }
+
+    // Check deadline
+    if (Date.now() > deadline) {
+      return 0;
+    }
+
+    // Determine if we've crossed a threshold
+    let warningUtilization: number | undefined;
+    let warningWindow: "5h" | "7d" | undefined;
+
+    if (
+      quota.fiveHourUtilization !== undefined &&
+      quota.fiveHourUtilization >= fiveHourThreshold
+    ) {
+      warningUtilization = quota.fiveHourUtilization;
+      warningWindow = "5h";
+    } else if (
+      quota.sevenDayUtilization !== undefined &&
+      quota.sevenDayUtilization >= weeklyThreshold
+    ) {
+      warningUtilization = quota.sevenDayUtilization;
+      warningWindow = "7d";
+    }
+
+    if (!warningUtilization || !warningWindow) {
+      return 0;
+    }
+
+    // Check debounce state: warn only on new 5%-step bucket
+    const advisorState = readAdvisorState(profile.configDir, sessionId || "unknown");
+    const currentBucket = Math.floor(warningUtilization / 5) * 5;
+
+    const lastBucket = advisorState[warningWindow];
+    if (lastBucket !== undefined && lastBucket >= currentBucket) {
+      // Already warned at this level
+      return 0;
+    }
+
+    // Update debounce state
+    advisorState[warningWindow] = currentBucket;
+    writeAdvisorState(profile.configDir, sessionId || "unknown", advisorState);
+
+    // Emit warning
+    const message =
+      `cchandoff: ${warningWindow} window at ${warningUtilization}% — ` +
+      `cache is warm: /handoff now is cheap, then cchandoff switch <other>`;
+
+    const output: HookOutput = {
+      hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: `(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)`,
+      },
+      systemMessage: message,
+    };
+
+    stdout.write(JSON.stringify(output) + "\n");
+    return 0;
+  } catch (err) {
+    logError(`hook user-prompt-submit: ${err instanceof Error ? err.message : String(err)}`);
+    return 0;
+  }
+}
+
+/**
+ * Read advisor debounce state for a session
+ */
+function readAdvisorState(
+  configDir: string,
+  sessionId: string
+): Record<string, number> {
+  const statePath = advisorStatePath(configDir);
+
+  if (!existsSync(statePath)) {
+    return {};
+  }
+
+  try {
+    const raw = readFileSync(statePath, "utf8");
+    const data = JSON.parse(raw) as Record<string, Record<string, number>>;
+    return data[sessionId] ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Write advisor debounce state for a session
+ */
+function writeAdvisorState(
+  configDir: string,
+  sessionId: string,
+  state: Record<string, number>
+): void {
+  const statePath = advisorStatePath(configDir);
+  const stateDir = dirname(statePath);
+
+  try {
+    mkdirSync(stateDir, { recursive: true });
+
+    let data: Record<string, Record<string, number>> = {};
+
+    // Read existing state
+    if (existsSync(statePath)) {
+      try {
+        const raw = readFileSync(statePath, "utf8");
+        data = JSON.parse(raw) as Record<string, Record<string, number>>;
+      } catch {
+        data = {};
+      }
+    }
+
+    // Update session state
+    data[sessionId] = state;
+
+    // Atomic write
+    const tmpPath = `${statePath}.tmp`;
+    writeFileSync(tmpPath, JSON.stringify(data, null, 2), "utf8");
+    renameSync(tmpPath, statePath);
+  } catch {
+    // Silent fail
+  }
 }
 
 /**

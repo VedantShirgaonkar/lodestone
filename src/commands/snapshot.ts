@@ -5,7 +5,8 @@ import { latestSession, parseSession } from "../core/transcript.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { findProjectRoot, mungeCwd, projectsDirFor } from "../core/paths.js";
 import { captureGitInfo, extractSnapshot } from "../core/extract.js";
-import { renderHandoff, saveHandoff, estimateTokens } from "../core/handoffFile.js";
+import { saveHandoff } from "../core/handoffFile.js";
+import { composeHandoff } from "../core/composeHandoff.js";
 
 interface CommandOptions {
   json: boolean;
@@ -18,6 +19,7 @@ interface SnapshotOutput {
   sessionId: string;
   contextTokens: number;
   created: string;
+  quality?: number;
 }
 
 export async function snapshot(
@@ -90,54 +92,18 @@ export async function snapshot(
     const projectMeta = extracted.gitInfo.branch || "unknown";
     const sourceSessionSlug = parsed.meta.slug || parsed.meta.sessionId || sessionId || "unknown";
 
-    // Render the handoff markdown
-    const goal = extracted.goal || "(no goal found)";
-    const state =
-      extracted.lastThreePrompts.length > 0
-        ? extracted.lastThreePrompts.join("\n---\n")
-        : "(no recent activity)";
-    const decisions = extracted.latestCompactSummary
-      ? `From the last compaction summary:\n\n${extracted.latestCompactSummary}`
-      : "(none recorded)";
-    const files =
-      extracted.filesEdited.length > 0 || extracted.filesRead.length > 0
-        ? [
-            extracted.filesEdited
-              .map((f) => `- ${f.name} (${f.count} edits)`)
-              .join("\n"),
-            extracted.filesRead
-              .map((f) => `- ${f} (read)`)
-              .join("\n"),
-          ]
-            .filter(Boolean)
-            .join("\n")
-        : "(no files)";
-    const lastExchange = extracted.finalAssistantText || "(no exchange)";
-    const nextSteps =
-      extracted.latestTodos.length > 0
-        ? extracted.latestTodos.map((t) => `- ${t}`).join("\n")
-        : "(none)";
-    const openQuestions = "(none recorded)";
-
-    const renderResult = renderHandoff({
-      goal,
-      state,
-      decisions,
-      files,
-      lastExchange,
-      nextSteps,
-      openQuestions,
+    // Compose the handoff (unified render + quality score)
+    const composed = composeHandoff(extracted, {
       sourceProfile: profileInfo.name,
       sourceSession: sourceSessionSlug,
       project: projectMeta,
-      ...(extracted.gitInfo.branch ? { branch: extracted.gitInfo.branch } : {}),
+      branch: extracted.gitInfo.branch,
       contextTokens: extracted.metrics.contextTokens,
       distilled: false,
       created: new Date().toISOString(),
     });
 
-    const { markdown, meta } = renderResult;
-    const handoffTokens = estimateTokens(markdown);
+    const { markdown, meta, tokens: handoffTokens, quality } = composed;
 
     // Write the file
     if (outPath) {
@@ -152,12 +118,13 @@ export async function snapshot(
     // Output results
     if (!quiet) {
       if (opts.json) {
-        const output: SnapshotOutput = {
+        const output: SnapshotOutput & { quality: number } = {
           path: outPath || join(projectRoot, ".claude/handoff/latest.md"),
           tokens: handoffTokens,
           sessionId: sourceSessionSlug,
           contextTokens: extracted.metrics.contextTokens,
           created: meta.created,
+          quality,
         };
         console.log(JSON.stringify(output));
       } else {
@@ -168,6 +135,10 @@ export async function snapshot(
         console.log(
           `~${handoffTokens} tokens · session ${sourceSessionSlug} · context ${extracted.metrics.contextTokens} tokens`
         );
+        console.log(`handoff quality: ${quality}/5`);
+        if (quality <= 2) {
+          console.log(`thin handoff — run /handoff in-session or use --distill for a better one`);
+        }
       }
     }
 

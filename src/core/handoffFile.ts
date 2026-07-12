@@ -13,6 +13,7 @@ export interface HandoffMeta {
   distilled: boolean;
   consumed: boolean;
   consumedBy?: { profile: string; session: string; at: string } | undefined;
+  quality?: number;
 }
 
 const TARGET_TOKENS = 2500;
@@ -43,10 +44,10 @@ export function renderHandoff(snapshot: {
   sourceProfile: string;
   sourceSession: string;
   project: string;
-  branch?: string;
+  branch?: string | undefined;
   contextTokens: number;
   distilled: boolean;
-  created?: string;
+  created?: string | undefined;
 }): { markdown: string; meta: HandoffMeta } {
   const created = snapshot.created ?? new Date().toISOString();
 

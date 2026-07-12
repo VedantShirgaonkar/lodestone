@@ -7,6 +7,11 @@ export interface ProfileConfig {
   label?: string;
 }
 
+export interface AdvisorSettings {
+  fiveHourPct?: number;
+  weeklyPct?: number;
+}
+
 export interface SettingsConfig {
   maxAgeDays?: number;
   injectOn?: string[];
@@ -14,6 +19,8 @@ export interface SettingsConfig {
   distillModel?: string;
   plan?: string; // "pro" | "max5" | "max20" | "team"
   weights?: Record<string, number>;
+  realUsage?: boolean;
+  advisor?: AdvisorSettings;
 }
 
 export interface CchandoffConfig {
