@@ -159,6 +159,40 @@ warmswap doctor        # diagnose setup
 
 ---
 
+## VS Code extension
+
+A lightweight VS Code companion extension brings warmswap quota monitoring and account switching into your editor's status bar, without leaving the IDE.
+
+**What it shows:**
+- Status bar item with current profile, 5h quota %, and weekly quota %
+- Click for a menu: Handoff & Switch, Keep Warm, Open Dashboard, Refresh, Enable Real Usage
+- Tooltip popover with per-profile quota bars (live/est labeled), cache countdown, savings, and advisor warning
+
+**How to install:**
+
+Once published to the VS Code Marketplace:
+```bash
+# Search "warmswap" in VS Code Extensions, or
+code --install-extension warmswap-vscode
+```
+
+For manual installation from source (or pre-release .vsix):
+```bash
+# Build: cd vscode && npm install && npm run compile
+# Package: npx @vscode/vsce package
+# Install: code --install-extension warmswap-vscode-0.1.0.vsix
+```
+
+**Requirements:**
+- warmswap CLI installed: `npm install -g warmswap` or `WARMSWAP_BIN=/path/to/warmswap` env var
+- VS Code 1.85+
+
+**Privacy:** Reads your local warmswap config and usage cache; runs the CLI in the integrated terminal; makes no external requests except when you opt in to real usage data (which reads Anthropic's usage endpoint per ADR-007). No credentials stored or transmitted.
+
+**Note:** The official Claude Code extension doesn't execute custom statuslines (anthropic/claude-code #55643), so quota data is not visible there. The warmswap companion extension bridges this gap by reading the same local usage cache and CLI.
+
+---
+
 ## Feature tour — real captured output
 
 Everything below was captured verbatim from a real machine during development (a ~450k-token working session on the 1M-context model). Your numbers will differ; the shapes won't.
@@ -381,8 +415,8 @@ Contributions welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Roadmap
 
-- **v0.1** (now): Core CLI, profiles, handoffs, advisor, audit, dash
-- **v0.2+** (planned): VS Code extension, enhanced OAuth caching, performance monitoring
-- **Future:** Community plugins for other editors, integration with other Claude tools
+- **v0.1** (now): Core CLI, profiles, handoffs, advisor, audit, dash, VS Code companion extension
+- **v0.2+** (planned): Enhanced OAuth caching, performance monitoring, community plugins for other editors
+- **Future:** Integration with other Claude tools
 
 See [docs/PLAN.md](docs/PLAN.md) for the full phase roadmap and [DIRECTION.md](docs/DIRECTION.md) for strategic context.

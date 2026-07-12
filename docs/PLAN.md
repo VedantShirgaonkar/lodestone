@@ -106,3 +106,25 @@ Real two-account run: profile add work + login; measured naive-vs-handoff switch
 
 ## Phase 8 — VS Code extension (post-launch, ADR-010 §3)
 `vscode/` workspace: statusbar item + Quota webview (both profiles, cache countdowns, rebuild cost, action buttons shelling to CLI). Marketplace listing. Only starts after npm launch.
+
+---
+
+# PLAN v3 (2026-07-12, post boundary-generalization review — ADR-012, research/07)
+
+> Status: PLAN v2 Phases 4–6 ✅; rename to warmswap ✅ (provisional — FINAL NAME REQUIRES EXPLICIT USER CONFIRMATION BEFORE ANY PUBLISH); VS Code extension built ✅ (pending final verify/commit). Below supersedes remaining work.
+
+## Phase 9 — Boundary generalization (ADR-012, all items)
+1. **Trail mode:** `warmswap trail on|off|status` — writes/removes `.claude/rules/warmswap-trail.md` (bounded-format instructions) + `.claude/skills/trail/SKILL.md`; `freshest()` ranks: explicit latest.md > fresh trail.md (age < settings.maxAgeDays, converted to handoff shape on read) > auto/. Advisor hook gains trail-staleness reminder (mtime older than `advisor.trailStaleMinutes` default 20 while session active; one reminder per crossing).
+2. **Refresh flow:** `/refresh` skill (compose handoff from live knowledge → tell user to `/clear`); `warmswap refresh` CLI (ensure fresh handoff via ladder, print the two-step instruction); advisor copy names compact-vs-refresh honestly per research/07 §3.
+3. **Advisor escalation:** `advisor.criticalPct` (default 95) → inline deterministic snapshot + wall-imminent systemMessage with post-reset instruction; tests for both thresholds and bucket debounce.
+4. **Audit classes:** switch / refresh / post-reset per ADR-012 §4; `--json` schema extends with `class`; totals per class; same-profile explicit events accepted, heuristic same-profile still rejected. status/dash "saved so far" shows per-class breakdown.
+5. **Keepalive ceiling:** `keepalive.maxWindowPct` config (default 80) wired through core/keepalive + config command + tests.
+6. **Extension additions:** menu entries Refresh-in-place & Trail toggle; savings-by-class in popover; optional cache-expiry toast (`expiryToastMinutes`, default off). cacheWarmth per-profile fix already applied.
+7. All figures remain labeled live/est; every new claim lands in README + FEATURES matrix + OVERVIEW.
+
+## Phase 10 — Naming + marketplace/npm presence (BLOCKING GATE: user picks name)
+1. Present name shortlist (npm + marketplace availability verified) → **user confirms → rename sweep #2 (mechanical, same checklist as cchandoff→warmswap) if changed.**
+2. Marketplace SEO package per research (to be completed when web access returns): displayName/description keyword placement, ≤5 keywords choice, category, 128px icon (generate simple SVG→PNG), gallery banner color, README-top optimization (first paragraph = search snippet), badges, `qna`, repository links; npm: keywords final pass, README badges. Encode findings in docs/research/08-marketplace-seo.md + apply to vscode/package.json + vscode/README.md.
+3. User creates GitHub repo (their account) → provides URL → `git remote add origin` → push; thereafter push after every commit (standing).
+
+## Phase 11 — Live validation + publish (user-in-the-loop; unchanged protocol EVALUATION.md + new: one refresh-arm measurement and a trail-mode session) → fill results → user publishes npm + marketplace (`vsce publish` under their publisher) → launch post draft.

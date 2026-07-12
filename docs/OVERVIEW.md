@@ -110,6 +110,6 @@ Anthropic's prompt cache is sealed per account (server-side, by design — verif
 |---|---|---|
 | Claude Code CLI (terminal) | ✅ | statusline + advisor + `/handoff` inside the session; CLI commands outside |
 | Claude Code **VS Code extension** | ✅ same engine | hooks, the `/handoff` skill, and the advisor work identically there (it's the same Claude Code core); terminal commands run in the integrated terminal |
-| Dedicated **VS Code companion extension** | 🔜 next build phase | native status-bar quota item + a Quota panel (both accounts side-by-side, cache countdowns, rebuild costs) + one-click "Handoff & Switch" buttons — no terminal needed |
+| Dedicated **VS Code companion extension** | ✅ built | native status-bar quota item (5h/weekly %, live/est labels, warning when crossing thresholds), tooltip popover with per-profile bars & resets, cache countdown, savings, and QuickPick menu for Handoff & Switch, Keep Warm, Dashboard, Refresh — no terminal needed |
 
 The companion extension stays thin by design: it reads the same data files and shells out to the same CLI, so there is exactly one brain and several faces.

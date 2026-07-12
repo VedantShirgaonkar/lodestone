@@ -26,6 +26,19 @@ jobs:
         env:
           NO_COLOR: 1
 
+  vscode:
+    name: VS Code Extension (Node 22)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: cd vscode && npm ci
+      - run: cd vscode && npm run compile
+      - run: cd vscode && npm test
+
   windows-build:
     name: Build on Windows (Node ${{ matrix.node }})
     runs-on: windows-latest
