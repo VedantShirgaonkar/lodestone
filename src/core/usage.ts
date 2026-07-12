@@ -161,18 +161,20 @@ export async function windowBurn(
       new Date(b.timestamp ?? "").getTime()
   );
 
-  // Find window start: first turn after last ≥5h idle gap
+  // Anthropic's session model: a window opens at the first message and lasts
+  // 5 hours; the next message AFTER expiry opens a new window. Under
+  // continuous use the window still rolls every 5h — an idle-gap scan alone
+  // would let long marathons "expire" their own window and zero the meter.
   const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
   let windowStart = allTurns[0]?.timestamp ?? new Date().toISOString();
   let windowStartTime = new Date(windowStart).getTime();
 
   for (let i = 1; i < allTurns.length; i++) {
-    const prevTurn = allTurns[i - 1];
     const currTurn = allTurns[i];
-    if (prevTurn?.timestamp && currTurn?.timestamp) {
-      const prev = new Date(prevTurn.timestamp).getTime();
+    if (currTurn?.timestamp) {
       const curr = new Date(currTurn.timestamp).getTime();
-      if (curr - prev > FIVE_HOURS_MS) {
+      if (curr >= windowStartTime + FIVE_HOURS_MS) {
+        // This turn opens a new window (whether after idle or mid-marathon).
         windowStart = currTurn.timestamp;
         windowStartTime = curr;
       }

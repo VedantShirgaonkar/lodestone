@@ -165,7 +165,7 @@ export async function switchCmd(
       if (!opts.json) {
         console.log();
         console.log(
-          "tip: paste .claude/handoff/latest.md into the new session, or run cchandoff init (Phase 3) for automatic injection"
+          "tip: run `cchandoff init` once and the new session picks this up automatically"
         );
       }
 
