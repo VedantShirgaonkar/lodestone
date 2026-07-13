@@ -1,20 +1,22 @@
+<p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/lodestone.png" width="128" alt="Lodestone"></p>
+
 # lodestone
 
 > Switch Claude Code accounts without torching your usage limits: isolated per-account profiles + automated context handoffs, measured.
 
-**Status:** v0.1.0 pre-release — feature-complete, 130 tests, dogfooded on real sessions; live two-account validation in progress (see [docs/EVALUATION.md](docs/EVALUATION.md)). Zero runtime dependencies. MIT.
+**Status:** v0.1.0 pre-release: feature-complete, 130 tests, dogfooded on real sessions; live two-account validation in progress (see [docs/EVALUATION.md](docs/EVALUATION.md)). Zero runtime dependencies. MIT.
 
 ---
 
 ## The problem
 
-Claude Code keeps sessions affordable through Anthropic's server-side 1-hour prompt cache: cache reads cost 0.1×, writes cost 2×. That cache is **sealed inside your account's organization** — official Anthropic API docs state: *"Different organizations never share caches, even if they use identical prompts."*
+Claude Code keeps sessions affordable through Anthropic's server-side 1-hour prompt cache: cache reads cost 0.1×, writes cost 2×. That cache is **sealed inside your account's organization**. Official Anthropic API docs state: *"Different organizations never share caches, even if they use identical prompts."*
 
-When you switch accounts mid-session (via `/login` or by picking another account), your next turn replays the entire conversation as fresh input to an org that has never seen it. At ~150k context tokens, that single turn costs ~20 normal turns. Users report losing **40–80% of a 5-hour usage window** to one switch.
+When you switch accounts mid-session (via `/login` or by picking another account), your next turn replays the entire conversation as fresh input to an org that has never seen it. At ~150k context tokens, that single turn costs ~20 normal turns. Users report losing **40-80% of a 5-hour usage window** to one switch.
 
-**No local tool can carry the cache across accounts** — that isolation is Anthropic-side and deliberate. What a tool *can* do is make what you carry across tiny.
+**No local tool can carry the cache across accounts.** This isolation is Anthropic-side and deliberate. What a tool *can* do is make what you carry across tiny.
 
-> **Read the full story:** [docs/explainer/how-claude-code-memory-works.md](docs/explainer/how-claude-code-memory-works.md) — the physics of Claude Code layers, cache TTLs, pricing buckets, and why the switch tax exists. Evidence in [docs/research/01-prompt-caching.md](docs/research/01-prompt-caching.md).
+> **Read the full story:** [docs/explainer/how-claude-code-memory-works.md](docs/explainer/how-claude-code-memory-works.md). It covers the physics of Claude Code layers, cache TTLs, pricing buckets, and why the switch tax exists. Evidence in [docs/research/01-prompt-caching.md](docs/research/01-prompt-caching.md).
 
 ---
 
@@ -22,13 +24,13 @@ When you switch accounts mid-session (via `/login` or by picking another account
 
 **Preserve the prompt cache across accounts.** Caches are keyed at the organization level and enforced server-side. Switching accounts means a cache miss, always. See [docs/research/01 final verdict](docs/research/01-prompt-caching.md#final-verdict-on-cross-account-cache-access-re-verified-2026-07-12-1000-check) for the full technical audit. 
 
-What lodestone *does* do: **minimize what must cross the boundary** — replace a ~150k-token conversation replay with a ~2k-token structured handoff.
+What lodestone *does* do: **minimize what must cross the boundary**. Replace a ~150k-token conversation replay with a ~2k-token structured handoff.
 
 ---
 
 ## What lodestone does
 
-### **Profiles** — isolated accounts
+### **Profiles.** Isolated accounts
 One `CLAUDE_CONFIG_DIR` per account. Your existing `~/.claude` is adopted untouched as `personal`. Create more:
 
 ```bash
@@ -38,18 +40,18 @@ lodestone login work
 
 Profiles are fully isolated: auth, settings, session history, all independent.
 
-### **Handoffs** — structured context recovery
+### **Handoffs.** Structured context recovery
 Three tiers (user follows the recommended path via the advisor):
 
-1. **Tier 1 (recommended): `/handoff` skill in-session** — write a handoff from live conversation knowledge, to `.claude/handoff/latest.md`. Zero extra cost; runs against a warm cache. The advisor nudges this while the session is alive (see below).
+1. **Tier 1 (recommended): `/handoff` skill in-session.** Write a handoff from live conversation knowledge, to `.claude/handoff/latest.md`. Zero extra cost; runs against a warm cache. The advisor nudges this while the session is alive (see below).
 
-2. **Tier 2: `lodestone handoff --distill`** — after leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
+2. **Tier 2: `lodestone handoff --distill`.** After leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
 
-3. **Tier 3 (floor, always on): Auto-snapshot** — deterministic extraction from transcripts (goal, recent prompts, files, todos, git state, last response) saved by `SessionEnd` and `PreCompact` hooks. Always there, free, no LLM required.
+3. **Tier 3 (floor, always on): Auto-snapshot.** Deterministic extraction from transcripts (goal, recent prompts, files, todos, git state, last response) saved by `SessionEnd` and `PreCompact` hooks. Always there, free, no LLM required.
 
 Each handoff includes a completeness score. Thin handoffs print a warning.
 
-### **Rehydration** — inject the handoff into the target session
+### **Rehydration.** Inject the handoff into the target session
 On `SessionStart` for the target account, a hook injects the latest handoff as additional context:
 
 ```
@@ -60,14 +62,14 @@ Restored handoff from work/12 min ago — verify file and git state before relyi
 
 The receiving Claude verifies against the live tree and continues. At ~2k tokens this costs ~4k weighted on the next turn vs. ~300k for a naive replay.
 
-### **Switch workflow** — account handoff in one command
+### **Switch workflow.** Account handoff in one command
 ```bash
 lodestone switch work
 ```
 
-This orchestrates: snapshot current session → distill (if desired) → launch Claude under the target account's `CLAUDE_CONFIG_DIR` in the same directory, where the SessionStart hook injects the handoff. It prints a measured cost comparison first — see the [feature tour](#feature-tour--real-captured-output) for real captured output (96% less on a real 450k-token session).
+This orchestrates: snapshot current session → distill (if desired) → launch Claude under the target account's `CLAUDE_CONFIG_DIR` in the same directory, where the SessionStart hook injects the handoff. It prints a measured cost comparison first. See the [feature tour](#feature-tour--real-captured-output) for real captured output (96% less on a real 450k-token session).
 
-### **Advisor** — when to handoff, before the limit
+### **Advisor.** When to handoff, before the limit
 Watches your real usage quota (real data from Claude Code's statusline or opt-in OAuth endpoint). At ≥85% of 5-hour window (or ≥90% weekly), emits a nudge:
 
 ```
@@ -77,7 +79,7 @@ Watches your real usage quota (real data from Claude Code's statusline or opt-in
 
 Shows once per 5%-step per session. Never blocks.
 
-### **Measure** — see what your past switches actually cost
+### **Measure.** See what your past switches actually cost
 ```bash
 lodestone audit
 ```
@@ -93,7 +95,7 @@ Session A → B (2026-07-12 14:22)
   Observed savings:         ~85%
 ```
 
-### **Dashboard** — live profile & session view
+### **Dashboard.** Live profile and session view
 ```bash
 lodestone dash
 ```
@@ -106,7 +108,7 @@ Full-screen ANSI TUI (q to quit, 2s refresh):
 
 `lodestone dash --once` for a single frame (test/CI use).
 
-### **Keepalive** — warm cache on switch-back
+### **Keepalive.** Warm cache on switch-back
 When switching to account B intending to return to A, the cache on A dies after 1 hour idle. A periodic "ping" on A (via `--resume --fork-session --max-turns 1`) costs ~0.1×C weighted and refreshes the TTL:
 
 ```bash
@@ -124,12 +126,12 @@ Standalone: `lodestone keepalive personal --for 5m` / `--stop`.
 Even on one account, your cache expires (B2: >1 hour idle) and resets (B3: 5-hour or weekly limits). The same handoff mechanism that crosses accounts works within the account:
 
 - **B2 (cache expiry >1h):** Use `lodestone refresh` to capture a handoff, then `/clear` the bloated context. The session-start hook injects the handoff, and you resume from a clean slate at ~2k tokens instead of replaying ~150k.
-- **B3 (wall: 5h or weekly limit):** Enable `trail mode` (`lodestone trail on`) to capture continuously during a session with fixed sections (goal, state, decisions, files, next), capped at ~1.5k tokens. When the limit resets, start a fresh session and the trail loads automatically — same cheap re-entry. Cost: ≈10–40k weighted per session (one to four ordinary turns), which is insurance for the wall surprise. Trail is opt-in; documented costs up-front.
+- **B3 (wall: 5h or weekly limit):** Enable `trail mode` (`lodestone trail on`) to capture continuously during a session with fixed sections (goal, state, decisions, files, next), capped at ~1.5k tokens. When the limit resets, start a fresh session and the trail loads automatically. It's the same cheap re-entry. Cost: ≈10-40k weighted per session (one to four ordinary turns), which is insurance for the wall surprise. Trail is opt-in; documented costs up-front.
 - **Refresh in VS Code:** The companion extension adds "Refresh In Place…" to the menu, wiring `lodestone refresh` without leaving the IDE.
 
-The tool's honest scope for single-account users: **every boundary (cache expiry, wall, voluntary shed) now costs ≈2×(S+H) instead of ≈2×C**, where S is session preamble (~15–25k), H is carried state (~1–2.5k), and C is live context (~100–450k). That's the win whether you switch accounts or stay on one. Without a handoff, the first turn after a boundary replays the whole conversation.
+The tool's honest scope for single-account users: **every boundary (cache expiry, wall, voluntary shed) now costs ≈2×(S+H) instead of ≈2×C**, where S is session preamble (~15-25k), H is carried state (~1-2.5k), and C is live context (~100-450k). That's the win whether you switch accounts or stay on one. Without a handoff, the first turn after a boundary replays the whole conversation.
 
-For B4 (voluntary shed with warm cache), native `/compact` is cheaper and recommended — the advisor tells you so.
+For B4 (voluntary shed with warm cache), native `/compact` is cheaper and recommended. The advisor tells you so.
 
 ---
 
@@ -207,7 +209,7 @@ For manual installation from source (or pre-release .vsix):
 
 ---
 
-## Feature tour — real captured output
+## Feature tour: real captured output
 
 Everything below was captured verbatim from a real machine during development (a ~450k-token working session on the 1M-context model). Your numbers will differ; the shapes won't.
 
@@ -230,7 +232,7 @@ personal  /Users/rahul/.claude      you@example.com (Your Organization)
 
 switch tax now: ≈ 911,940 weighted tokens naive vs ≈ 42,408 with handoff
 ```
-(email redacted; `est` marks the local burn model — with real `rate_limits` data the bar is labeled `live`)
+(email redacted; `est` marks the local burn model: with real `rate_limits` data the bar is labeled `live`)
 
 ### Statusline (in Claude Code, with real quota data)
 ```
@@ -238,7 +240,7 @@ switch tax now: ≈ 911,940 weighted tokens naive vs ≈ 42,408 with handoff
 ```
 `cache 43m` is the session cache TTL (minutes until cold), `▲87` is the pacing target (where linear consumption "should" be), `(2h10m)` the reset countdown, `⚠ handoff?` the advisor at threshold.
 
-### Advisor (UserPromptSubmit hook — shown by Claude Code as a system message)
+### Advisor (UserPromptSubmit hook: shown by Claude Code as a system message)
 ```json
 {"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)"},"systemMessage":"lodestone: 5h window at 87% — cache is warm: /handoff now is cheap, then lodestone switch <other>"}
 ```
@@ -255,7 +257,7 @@ switch tax: naive ~869526 vs handoff ~45000 (−95%)
 
 ⚠ personal: 5h at 207% — consider /handoff
 ```
-(Yes, 207% — the local estimate is honest about a marathon session blowing past a Pro-window budget; bars clamp, text doesn't lie.)
+(Yes, 207%: the local estimate is honest about a marathon session blowing past a Pro-window budget; bars clamp, text doesn't lie.)
 
 ### Keepalive plan (from the integration test fixture, ~3.3k-token session)
 ```
@@ -276,23 +278,23 @@ On a machine that has never switched profiles yet it honestly reports `No switch
 
 ## How it works
 
-1. **Profiles** — One `CLAUDE_CONFIG_DIR` per account, isolated via environment. Your existing `~/.claude` is adopted as `personal`. [ADR-002](docs/decisions/ADR-002-profiles-via-config-dir.md)
+1. **Profiles.** One `CLAUDE_CONFIG_DIR` per account, isolated via environment. Your existing `~/.claude` is adopted as `personal`. [ADR-002](docs/decisions/ADR-002-profiles-via-config-dir.md)
 
-2. **Handoff format** — Structured extract from live sessions (goal, decisions, files, todos, git state, next steps) serialized to markdown. Always ≤2500 chars. [ARCHITECTURE §3](docs/ARCHITECTURE.md)
+2. **Handoff format.** Structured extract from live sessions (goal, decisions, files, todos, git state, next steps) serialized to markdown. Always ≤2500 chars. [ARCHITECTURE §3](docs/ARCHITECTURE.md)
 
-3. **Injection** — `SessionStart` hook reads the freshest handoff from the current project and injects it into Claude as additional context. Framing reminds the user to verify against the tree. [ADR-001](docs/decisions/ADR-001-handoff-not-cache-transfer.md), [ARCHITECTURE §5](docs/ARCHITECTURE.md)
+3. **Injection.** `SessionStart` hook reads the freshest handoff from the current project and injects it into Claude as additional context. Framing reminds the user to verify against the tree. [ADR-001](docs/decisions/ADR-001-handoff-not-cache-transfer.md), [ARCHITECTURE §5](docs/ARCHITECTURE.md)
 
-4. **Real usage data** — Native Claude Code `rate_limits` (free, in-session) + opt-in OAuth endpoint (cross-profile view, behind `config set realUsage on`). [ADR-007](docs/decisions/ADR-007-realtime-usage-sources.md), [research/06](docs/research/06-realtime-usage-and-ui.md)
+4. **Real usage data.** Native Claude Code `rate_limits` (free, in-session) + opt-in OAuth endpoint (cross-profile view, behind `config set realUsage on`). [ADR-007](docs/decisions/ADR-007-realtime-usage-sources.md), [research/06](docs/research/06-realtime-usage-and-ui.md)
 
-5. **Advisor** — Watches quota, nudges `/handoff` while cache is warm (85% of 5h window, 90% weekly). No blocking, debounced. [ADR-007](docs/decisions/ADR-007-realtime-usage-sources.md)
+5. **Advisor.** Watches quota, nudges `/handoff` while cache is warm (85% of 5h window, 90% weekly). No blocking, debounced. [ADR-007](docs/decisions/ADR-007-realtime-usage-sources.md)
 
-6. **Quality ladder** — Tier 1 (in-session skill, recommended) → Tier 2 (distill, cheap) → Tier 3 (auto-snapshot, free). Completeness score shows which tier was used. [ADR-008](docs/decisions/ADR-008-handoff-quality-ladder.md)
+6. **Quality ladder.** Tier 1 (in-session skill, recommended) → Tier 2 (distill, cheap) → Tier 3 (auto-snapshot, free). Completeness score shows which tier was used. [ADR-008](docs/decisions/ADR-008-handoff-quality-ladder.md)
 
 Full explainer: [docs/explainer/how-claude-code-memory-works.md](docs/explainer/how-claude-code-memory-works.md)
 
 ---
 
-## Real usage data — two layers
+## Real usage data: two layers
 
 ### Layer A: In-session (native, always available)
 Claude Code natively passes `rate_limits` (real quota %) into statusline on every render. Our statusline captures it to `~/.config/lodestone/usage-cache.json` so hooks and status can read it without any API call. The advisor uses this.
@@ -305,11 +307,11 @@ lodestone config set realUsage on
 
 Uses the OAuth access token from your OS keychain (macOS) or credentials.json (Linux). Token is never stored, copied, or sent anywhere except `api.anthropic.com` over TLS. Responses cached ≥180s. Falls back to JSONL estimation if unavailable or 429-limited.
 
-> **Risk disclosure:** This uses an undocumented endpoint (like community tools do). It may change. Never a hard dependency — failures gracefully degrade to estimates. See [SECURITY.md](SECURITY.md) for the full model.
+> **Risk disclosure:** This uses an undocumented endpoint (like community tools do). It may change. Never a hard dependency; failures gracefully degrade to estimates. See [SECURITY.md](SECURITY.md) for the full model.
 
 ---
 
-## Keepalive — cost & guardrails
+## Keepalive: cost and guardrails
 
 When you return to account A after switching to B, the cache is dead if >1 hour idle, costing ~2×C weighted (~300k at 150k context). A periodic 52-minute "ping" on A costs ~0.1×C weighted (~15k) and refreshes the TTL.
 
@@ -319,7 +321,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 - Default: 3 pings (works up to ~3h away)
 
 **Guardrails:**
-- Never enabled by default — always explicit: `lodestone switch work --keep-warm 90m`
+- Never enabled by default. Always explicit: `lodestone switch work --keep-warm 90m`
 - Skips if source profile's 5h ≥80% (don't waste quota near the limit)
 - Each ping prints cost before running
 - `--no-session-persistence` supported (verify empirically in your EVALUATION run)
@@ -364,7 +366,7 @@ Optional OAuth layer (`config set realUsage on`): reads your OAuth access token 
 ### **Single-account use case?**
 Yes, effective. Resuming a big session after the 1-hour cache lapses costs the same 2×C rewrite as a cross-account switch. A fresh session + handoff is cheaper.
 
-### **The undocumented usage endpoint — will it break?**
+### **Will the undocumented usage endpoint break?**
 Maybe. It's used by community tools and Claude Code itself, but it's not officially documented by Anthropic. We:
 1. Treat it as a nice-to-have enhancement, never required (falls back to JSONL estimates)
 2. Cache responses ≥180s and respect rate limits
@@ -374,7 +376,7 @@ Maybe. It's used by community tools and Claude Code itself, but it's not officia
 Safest stance: test on a non-critical account first.
 
 ### **Doesn't Claude Code's native prompt cache TTL handle this?**
-Yes, within one account. TTL refresh (hitting the cache to reset the 1h clock) is free. We use this in the keepalive feature. But **TTL is per-account** — switching accounts means cache miss, and there's nothing a client-side tool can do about that. See [research/01](docs/research/01-prompt-caching.md).
+Yes, within one account. TTL refresh (hitting the cache to reset the 1h clock) is free. We use this in the keepalive feature. But **TTL is per-account**. Switching accounts means cache miss, and there's nothing a client-side tool can do about that. See [research/01](docs/research/01-prompt-caching.md).
 
 ### **How do I know it actually works?**
 `lodestone audit` shows your past switches + cost deltas. `lodestone status` and `dash` show live metrics. The handoff files themselves (`.claude/handoff/latest.md` and archived versions) are human-readable. We include an evaluation methodology in [EVALUATION.md](docs/EVALUATION.md).

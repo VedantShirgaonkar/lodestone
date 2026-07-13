@@ -1,4 +1,6 @@
-# lodestone — VS Code companion extension
+<p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/lodestone.png" width="128" alt="Lodestone"></p>
+
+# lodestone: VS Code companion extension
 
 A lightweight VS Code extension that bridges lodestone's account-switching and quota monitoring into your editor's status bar.
 

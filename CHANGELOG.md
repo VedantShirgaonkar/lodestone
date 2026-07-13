@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] — 2026-07-12
+## [0.1.0] - 2026-07-12
 
 **Initial release: Core CLI, profiles, handoffs, advisor, audit, and dashboard.**
 
@@ -20,12 +20,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Switch command**: One-command account handoff: `lodestone switch <target> [--distill] [--stay]` with cost comparison printout.
 - **Advisor**: Watches usage quota, nudges `/handoff` while cache is warm (≥85% 5h window, ≥90% weekly), no blocking. At ≥95% (critical threshold), fires deterministic snapshot inline with wall-imminent message.
 - **Refresh flow**: `/refresh` skill in-session (compose handoff → instruct user to `/clear`) + `lodestone refresh` CLI for outside-session use. Handles B2 (cold cache) and B4 (voluntary shed) within the same account.
-- **Trail mode**: `lodestone trail on/off/status` installs bounded capture rules + skill that continuously maintain `.claude/handoff/trail.md` (~1.5k tokens, fixed sections overwritten in place). Optional wall insurance; cost ≈10–40k weighted/session (opt-in, documented honestly).
+- **Trail mode**: `lodestone trail on/off/status` installs bounded capture rules + skill that continuously maintain `.claude/handoff/trail.md` (~1.5k tokens, fixed sections overwritten in place). Optional wall insurance; cost ≈10-40k weighted/session (opt-in, documented honestly).
 - **Measurement**: `lodestone audit` scans profile history for handoff events and heuristic boundaries; reports per-switch cost deltas (naive vs. handoff). Event classes: `switch` (different profile), `refresh` (same profile, <5h gap), `post-reset` (same profile, ≥5h gap after quota boundary). Totals per class in JSON and human output.
 - **Dashboard**: `lodestone dash` live full-screen TUI (ANSI, zero deps): per-profile quota bars, live sessions with cache countdown, switch-tax panel, advisor line, keepalive status.
 - **Keepalive**: `lodestone switch <target> --keep-warm <duration>` schedules periodic TTL-refresh pings on the source profile to keep cache warm while on the target. Configurable `keepalive.maxWindowPct` ceiling (default 80): skips pings at/above that 5h window usage to preserve headroom.
 - **Real usage data**:
-  - Layer A (native): Captures Claude Code's native `rate_limits` from statusline into local cache — powers advisor, dashboard, status without any API call.
+  - Layer A (native): Captures Claude Code's native `rate_limits` from statusline into local cache; powers advisor, dashboard, status without any API call.
   - Layer B (opt-in OAuth): `lodestone config set realUsage on` for cross-profile quota via undocumented endpoint, cached ≥180s, gracefully degrades to JSONL estimates if unavailable.
 
 #### Commands
@@ -46,17 +46,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - `help`: Show command help; `<command> --help` for subcommand help.
 
 #### Automation & Hooks
-- **Hook: `session-start`** — Inject the latest handoff into a fresh session (via `SessionStart` hook).
-- **Hook: `session-end`** / **`pre-compact`** — Auto-snapshot to `auto/` slot (respects `settings.autoSnapshot`).
-- **Hook: `user-prompt-submit`** — Advisor nudge when quota threshold crossed (once per 5%-step per session); at 95% critical threshold, inlines deterministic snapshot + wall-imminent message.
-- **Statusline v2** — Renders: real `rate_limits` (or estimates), pacing marker, cache-warmth countdown, advisor glyph.
-- `/handoff` skill — In-session context extraction (Tier 1); installed by `init --project`.
-- `/refresh` skill — In-session refresh flow (Tier 1 same-account): compose handoff + instruct user to `/clear`.
-- `/trail` skill — Trail mode update directive; works with `lodestone trail on` installation.
+- **Hook: `session-start`.** Inject the latest handoff into a fresh session (via `SessionStart` hook).
+- **Hook: `session-end`** / **`pre-compact`.** Auto-snapshot to `auto/` slot (respects `settings.autoSnapshot`).
+- **Hook: `user-prompt-submit`.** Advisor nudge when quota threshold crossed (once per 5%-step per session); at 95% critical threshold, inlines deterministic snapshot + wall-imminent message.
+- **Statusline v2.** Renders: real `rate_limits` (or estimates), pacing marker, cache-warmth countdown, advisor glyph.
+- `/handoff` skill. In-session context extraction (Tier 1); installed by `init --project`.
+- `/refresh` skill. In-session refresh flow (Tier 1 same-account): compose handoff + instruct user to `/clear`.
+- `/trail` skill. Trail mode update directive; works with `lodestone trail on` installation.
 
 #### VS Code Companion Extension
 - **Status bar item**: Shows current profile, 5h quota %, weekly quota %; click for menu.
-- **QuickPick menu**: Actions — Handoff & Switch, **Refresh In Place**, **Trail Mode: toggle**, Keep Warm, Dashboard, Refresh Status, Enable Real Usage.
+- **QuickPick menu**: Actions include Handoff & Switch, **Refresh In Place**, **Trail Mode: toggle**, Keep Warm, Dashboard, Refresh Status, Enable Real Usage.
 - **Popover tooltip**: Per-profile quota bars with reset countdowns; per-project cache TTL countdowns; savings totals with **per-class breakdown** (switch/refresh/post-reset); advisor warning line.
 - **Cache expiry toast**: Optional warning when a project's cache is within N minutes of expiry (configurable `lodestone.expiryToastMinutes`, default 0 = off); "Keep warm" button wires to keepalive flow.
 - **package.json contributions**: Configuration setting `lodestone.expiryToastMinutes` (number, default 0).
@@ -65,7 +65,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 #### Output & UX
 - `--json` flag for machine-readable output (status, audit, handoff metadata).
 - Deterministic, scannable human output: progress bars, colored warnings, token estimates labeled `est`.
-- Completeness score on handoff output (0–5 across goal/state/decisions/files/next-steps).
+- Completeness score on handoff output (0-5 across goal/state/decisions/files/next-steps).
 - "Thin handoff" warning when deterministic extraction scores low.
 
 #### Configuration
@@ -109,9 +109,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 - **Keepalive empirical validation pending**: Keepalive feature (ADR-009) must be live-tested in Phase 7 to confirm fork-session TTL behavior matches expectations before README may claim it.
 - **Windows best-effort**: Native Windows support is best-effort (Credentials.json path works; hooks via PowerShell/WSL tested). Report concrete issues.
-- **Undocumented endpoint risk**: Real-usage OAuth endpoint is undocumented (like community tools) — graceful degradation to estimates if Anthropic changes it.
-- **Single-machine keepalive**: Keepalive uses a local pidfile scheduler (no daemons, no cron edits) — survives only while the machine is awake.
-- **Deterministic extraction quality**: Thin handoffs on atypical sessions — mitigated by advisor-driven Tier 1/2 paths and completeness scoring.
+- **Undocumented endpoint risk**: Real-usage OAuth endpoint is undocumented (like community tools); graceful degradation to estimates if Anthropic changes it.
+- **Single-machine keepalive**: Keepalive uses a local pidfile scheduler (no daemons, no cron edits); survives only while the machine is awake.
+- **Deterministic extraction quality**: Thin handoffs on atypical sessions; mitigated by advisor-driven Tier 1/2 paths and completeness scoring.
 
 ### Not Included (Phase 7+)
 
