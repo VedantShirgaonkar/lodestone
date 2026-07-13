@@ -301,6 +301,7 @@ async function handleHandoffSwitch() {
 
   if (!target) return;
 
+  if (!isSafeToken(target.value)) return;
   runInTerminal(`lodestone switch ${target.value}`);
 }
 
@@ -347,11 +348,14 @@ async function handleKeepWarm() {
   const duration = await vscode.window.showInputBox({
     prompt: "Keep warm for how long? (e.g., 90m, 2h)",
     value: "90m",
+    validateInput: (v) =>
+      DURATION_RE.test(v.trim()) ? undefined : "Use a duration like 90m or 2h",
   });
 
-  if (!duration) return;
+  if (!duration || !DURATION_RE.test(duration.trim())) return;
+  if (!isSafeToken(picked.value)) return;
 
-  runInTerminal(`lodestone keepalive ${picked.value} --for ${duration}`);
+  runInTerminal(`lodestone keepalive ${picked.value} --for ${duration.trim()}`);
 }
 
 /**
@@ -380,6 +384,18 @@ async function showExpiryToast(
     await handleKeepWarm();
   }
   // "Dismiss" does nothing; the toast is gone
+}
+
+/**
+ * Anything interpolated into a terminal command must match these first:
+ * a profile name or a duration, nothing that a shell could reinterpret.
+ * Without this, a duration typed as `90m; rm -rf ~` would be executed.
+ */
+const DURATION_RE = /^\d{1,4}[mh]$/;
+const TOKEN_RE = /^[A-Za-z0-9._-]{1,64}$/;
+
+function isSafeToken(value: string): boolean {
+  return TOKEN_RE.test(value);
 }
 
 /**

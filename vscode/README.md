@@ -1,46 +1,41 @@
 <p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/lodestone.png" width="128" alt="Lodestone"></p>
 
-# lodestone: VS Code companion extension
+# Lodestone for VS Code
 
-A lightweight VS Code extension that bridges lodestone's account-switching and quota monitoring into your editor's status bar.
+Live Claude Code usage and cache monitoring in your status bar, with one click handoffs and account switching. Companion to the [lodestone CLI](https://github.com/VedantShirgaonkar/lodestone).
 
 ## What it does
 
-**One status bar item** shows your lodestone account profile, 5-hour quota %, weekly quota %, and warns when you're approaching usage limits.
+**One status bar item** shows the active profile, the 5 hour quota, the weekly quota, and turns amber as you approach a usage limit.
 
-**Click the status bar** for a menu:
-- **Handoff & Switch Account…** Pick a profile and run the account switch with handoff
-- **Keep Current Account Warm…** Keep your current session cache alive while switching
-- **Open Dashboard (terminal)** Live quota bars, cache countdowns, and switch-cost view for all profiles
-- **Refresh Status** Manually refresh quota display
-- **Enable real usage data** Opt in to live quota from Anthropic's API (requires credentials)
+**Hover it** for a popover with:
 
-**Tooltip popover** shows:
-- Per-profile quota bars (5h and weekly) with live/est labels and reset countdowns
-- Per-project cache warmth (minutes remaining before cold)
-- Total tokens saved (from `lodestone audit`)
-- Advisor line if any profile crosses configured thresholds
-- Footer hint
+- Per profile quota bars for the 5 hour and weekly windows, labeled live or est, with reset countdowns
+- Per project cache warmth: minutes remaining before the prompt cache goes cold
+- Tokens saved so far, grouped by switch, refresh, and post reset
+- An advisor line when any profile crosses your configured thresholds
 
-The extension reads your lodestone config and profile usage caches locally; it shells out to the CLI for additional data (status, audit). **No webviews, no external requests (unless you opt in to real usage data).**
+**Click it** for a menu:
+
+- **Handoff and Switch Account** captures a handoff and switches to another account
+- **Refresh In Place** writes a handoff so you can clear a bloated session and reload it cheaply
+- **Trail Mode** toggles continuous capture, which survives a usage limit that lands mid task
+- **Keep Current Account Warm** schedules cheap keepalive pings so the cache does not go cold
+- **Open Dashboard** opens the full terminal view
 
 ## Requirements
 
-- **lodestone CLI** installed (`npm install -g lodestone-cli`; or `LODESTONE_BIN=/path/to/lodestone` env var)
-- VS Code 1.85+
+- The lodestone CLI: `npm install -g lodestone-cli`
+- VS Code 1.85 or newer
+
+## Settings
+
+- `lodestone.expiryToastMinutes`: warn when a project cache is within N minutes of expiring. Set to 0 to disable, which is the default.
 
 ## Privacy
 
-- Reads local files: lodestone config, usage cache, transcript directories
-- Runs the lodestone CLI via `execSync` (visible in terminal); no hidden API calls
-- Optional real usage data is opt-in via `lodestone config set realUsage on`; the CLI reads Anthropic's usage endpoint only over TLS, per ADR-007
-- Does not store, copy, or transmit any credentials
+The extension reads local files only: your lodestone config, its usage cache, and transcript timestamps. It runs the lodestone CLI as a subprocess to fetch status and audit data. It makes no network requests of its own, and it never reads, stores, or transmits credentials. Optional real usage data is opt in and handled entirely by the CLI.
 
-## Screenshots
+## License
 
-_(Placeholder: status bar item with quota text; tooltip popover; QuickPick menu)_
-
-## Links
-
-- [lodestone repository](https://github.com/VedantShirgaonkar/lodestone)
-- [CLI documentation](../docs/OVERVIEW.md)
+MIT. Not affiliated with, or endorsed by, Anthropic or Microsoft.
