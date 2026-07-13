@@ -17,7 +17,7 @@ Live Claude Code usage and cache monitoring in your status bar, with one click h
 
 **Click it** for a menu:
 
-- **Handoff and Switch Account** captures a handoff and switches to another account
+- **Handoff and Switch Account** copies the switch command to your clipboard, ready to run
 - **Refresh In Place** writes a handoff so you can clear a bloated session and reload it cheaply
 - **Trail Mode** toggles continuous capture, which survives a usage limit that lands mid task
 - **Keep Current Account Warm** schedules cheap keepalive pings so the cache does not go cold
@@ -34,7 +34,7 @@ Live Claude Code usage and cache monitoring in your status bar, with one click h
 
 ## Privacy
 
-The extension reads local files only: your lodestone config, its usage cache, and transcript timestamps. It runs the lodestone CLI as a subprocess to fetch status and audit data. It makes no network requests of its own, and it never reads, stores, or transmits credentials. Optional real usage data is opt in and handled entirely by the CLI.
+The extension reads local files only: your lodestone config, its usage cache, and transcript timestamps. It makes no network requests of its own, and it never reads, stores, or transmits credentials. Optional real usage data is opt in and handled entirely by the CLI.
 
 ## License
 
