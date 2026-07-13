@@ -148,7 +148,7 @@ export async function statusline(): Promise<number> {
           const secsLeft = Math.max(0, resetEpoch - nowEpoch);
           const WINDOW = 5 * 3600;
           const target = Math.round(((WINDOW - secsLeft) / WINDOW) * 100);
-          if (fiveHourPct > target + 5) pacing = dim(` ▲${target}`);
+          if (fiveHourPct > target + 5) pacing = dim(" ▲"); // burning ahead of pace
           const minutesRemaining = Math.round(secsLeft / 60);
           if (minutesRemaining > 0 && minutesRemaining < 300) {
             countdown = dim(` ${formatDuration(minutesRemaining * 60)}`);

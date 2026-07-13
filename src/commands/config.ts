@@ -84,8 +84,18 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
 
   try {
     if (key === "realUsage") {
-      const boolValue = value.toLowerCase() === "true" || value === "1";
-      config.settings.realUsage = boolValue;
+      // "on" is what the docs, the extension button and every human types.
+      // Accepting only "true" meant this switch silently stayed off.
+      const v = value.trim().toLowerCase();
+      const truthy = ["on", "true", "yes", "1", "enable", "enabled"];
+      const falsy = ["off", "false", "no", "0", "disable", "disabled"];
+      if (!truthy.includes(v) && !falsy.includes(v)) {
+        console.error(
+          `lodestone config: realUsage must be on or off (got "${value}")`
+        );
+        return 1;
+      }
+      config.settings.realUsage = truthy.includes(v);
     } else if (key === "advisor.fiveHourPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {

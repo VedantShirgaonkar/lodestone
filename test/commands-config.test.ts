@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert";
 import { execFile } from "node:child_process";
-import { mkdir, writeFile, rm, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { mkdir, mkdtemp, writeFile, rm, readFile } from "node:fs/promises";
+import { resolve, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
@@ -224,4 +224,47 @@ test("config: json output format", async () => {
   assert.equal(output.value, false);
 
   await rm(testHome, { recursive: true, force: true });
+});
+
+import { main } from "../src/cli.js";
+
+test("config: realUsage accepts on/off, rejects nonsense", async () => {
+  const home = await mkdtemp(join(tmpdir(), "lodestone-cfg-"));
+  await mkdir(join(home, ".config/lodestone"), { recursive: true });
+  await writeFile(
+    join(home, ".config/lodestone/config.json"),
+    JSON.stringify({ schema: 1, profiles: {}, settings: {} })
+  );
+  const oldHome = process.env.HOME;
+  const oldXdg = process.env.XDG_CONFIG_HOME;
+  process.env.HOME = home;
+  process.env.XDG_CONFIG_HOME = join(home, ".config");
+  const log = console.log;
+  const err = console.error;
+  console.log = () => {};
+  console.error = () => {};
+  try {
+    // "on" is what the extension button and the docs send. It used to be
+    // parsed as false, which made the whole real-usage feature unreachable.
+    assert.strictEqual(await main(["config", "set", "realUsage", "on"]), 0);
+    let cfg = JSON.parse(
+      await readFile(join(home, ".config/lodestone/config.json"), "utf8")
+    );
+    assert.strictEqual(cfg.settings.realUsage, true);
+
+    assert.strictEqual(await main(["config", "set", "realUsage", "off"]), 0);
+    cfg = JSON.parse(
+      await readFile(join(home, ".config/lodestone/config.json"), "utf8")
+    );
+    assert.strictEqual(cfg.settings.realUsage, false);
+
+    assert.strictEqual(await main(["config", "set", "realUsage", "banana"]), 1);
+  } finally {
+    console.log = log;
+    console.error = err;
+    if (oldHome !== undefined) process.env.HOME = oldHome;
+    if (oldXdg !== undefined) process.env.XDG_CONFIG_HOME = oldXdg;
+    else delete process.env.XDG_CONFIG_HOME;
+    await rm(home, { recursive: true, force: true });
+  }
 });

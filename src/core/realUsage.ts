@@ -39,6 +39,26 @@ export interface QuotaResult {
 /** A quota climbing during heavy work goes visibly wrong within minutes. */
 const FRESH_MS = 90 * 1000;         // bridge this new is as good as live
 const USABLE_MS = 15 * 60 * 1000;   // older than this, prefer an estimate
+const OAUTH_TTL_MS = 2 * 60 * 1000; // how long the endpoint's answer stays good
+
+function readJsonIfFresh(path: string, maxAgeMs: number): UsageCacheData | undefined {
+  if (!existsSync(path)) return undefined;
+  try {
+    const data = JSON.parse(readFileSync(path, "utf8")) as UsageCacheData;
+    return Date.now() - data.fetchedAt > maxAgeMs ? undefined : data;
+  } catch {
+    return undefined;
+  }
+}
+
+function writeJson(path: string, data: UsageCacheData): void {
+  try {
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(data, null, 2), "utf8");
+  } catch {
+    // never fatal
+  }
+}
 
 /**
  * Cache bridge path for statusline-driven real data
@@ -50,6 +70,12 @@ export function usageCachePath(configDir: string): string {
 /**
  * Advisor state path for debounce tracking
  */
+/** The endpoint's answer lives in its own file: the statusline rewrites the
+ *  bridge on every render and would otherwise clobber it within seconds. */
+export function oauthCachePath(configDir: string): string {
+  return join(configDir, "lodestone", "usage-live.json");
+}
+
 export function advisorStatePath(configDir: string): string {
   return join(configDir, "lodestone", "advisor-state.json");
 }
@@ -81,6 +107,29 @@ export function readUsageCache(
 /**
  * Write usage cache from statusline rate_limits
  */
+function toEpochSeconds(v: string | number | undefined): number | undefined {
+  if (v === undefined) return undefined;
+  if (typeof v === "number") return v > 1e12 ? Math.round(v / 1000) : v;
+  const ms = Date.parse(v);
+  return Number.isNaN(ms) ? undefined : Math.round(ms / 1000);
+}
+
+/** The statusline speaks {used_percentage, resets_at_ts}; the usage endpoint
+ *  speaks {utilization, resets_at}. Readers should never have to know that, so
+ *  every write is normalized to the first shape here. */
+function normalizeSegment(
+  seg: UsageBudgetSegment | null | undefined
+): UsageBudgetSegment | undefined {
+  if (!seg) return undefined;
+  const pct = seg.used_percentage ?? seg.utilization;
+  const ts = seg.resets_at_ts ?? toEpochSeconds(seg.resets_at);
+  if (pct === undefined && ts === undefined) return undefined;
+  const out: UsageBudgetSegment = {};
+  if (pct !== undefined) out.used_percentage = Math.round(pct);
+  if (ts !== undefined) out.resets_at_ts = ts;
+  return out;
+}
+
 export function writeUsageCache(
   configDir: string,
   data: Partial<UsageCacheData>
@@ -92,9 +141,11 @@ export function writeUsageCache(
     mkdirSync(cacheDir, { recursive: true });
 
     const full: UsageCacheData = {
+      ...data,
       fetchedAt: Date.now(),
       source: data.source ?? "statusline",
-      ...data,
+      five_hour: normalizeSegment(data.five_hour),
+      seven_day: normalizeSegment(data.seven_day),
     };
 
     writeFileSync(cachePath, JSON.stringify(full, null, 2), "utf8");
@@ -235,39 +286,42 @@ export async function getQuota(
     ageSeconds: Math.max(0, Math.round((Date.now() - data.fetchedAt) / 1000)),
   });
 
-  // 1. A bridge entry written seconds ago (a live statusline render) is as
-  //    good as a fresh fetch, and costs nothing.
+  // 1. Opted into real usage: the endpoint is the authority. Claude Code's own
+  //    rate_limits lag behind it (they are whatever the last API response said),
+  //    which is why our numbers used to read a few points under the truth.
+  //    Its answer is cached for two minutes: enough to stay current, far below
+  //    what the endpoint rate-limits at.
+  if (isRealUsageOptedIn) {
+    const cachedLive = readJsonIfFresh(oauthCachePath(configDir), OAUTH_TTL_MS);
+    if (cachedLive) {
+      return asBridge(cachedLive);
+    }
+    const oauthData = await fetchOAuthQuota(configDir, claudeVersion, fetchImpl);
+    if (oauthData) {
+      writeJson(oauthCachePath(configDir), {
+        ...oauthData,
+        five_hour: normalizeSegment(oauthData.five_hour),
+        seven_day: normalizeSegment(oauthData.seven_day),
+      });
+      return {
+        source: "oauth",
+        fiveHourUtilization: normalizeSegment(oauthData.five_hour)?.used_percentage,
+        fiveHourResetsAt: normalizeSegment(oauthData.five_hour)?.resets_at_ts,
+        sevenDayUtilization: normalizeSegment(oauthData.seven_day)?.used_percentage,
+        sevenDayResetsAt: normalizeSegment(oauthData.seven_day)?.resets_at_ts,
+        ageSeconds: 0,
+      };
+    }
+    // Endpoint unavailable: fall through to whatever the statusline last saw.
+  }
+
+  // 2. The statusline's bridge, free and usually seconds old.
   const fresh = readUsageCache(configDir, FRESH_MS);
   if (fresh) {
     return asBridge(fresh);
   }
 
-  // 2. Otherwise fetch the truth if the user opted in. This is the path that
-  //    keeps figures current inside VS Code, where Claude Code runs no
-  //    statusline and therefore never refreshes the bridge.
-  if (isRealUsageOptedIn) {
-    const oauthData = await fetchOAuthQuota(configDir, claudeVersion, fetchImpl);
-    if (oauthData) {
-      // Persist to the bridge so the 10-minute freshness gate throttles
-      // subsequent calls (ADR-007: never poll the endpoint per-prompt).
-      writeUsageCache(configDir, oauthData);
-      return {
-        source: "oauth",
-        fiveHourUtilization: oauthData.five_hour?.utilization,
-        fiveHourResetsAt: oauthData.five_hour?.resets_at
-          ? new Date(oauthData.five_hour.resets_at).getTime() / 1000
-          : undefined,
-        sevenDayUtilization: oauthData.seven_day?.utilization,
-        sevenDayResetsAt: oauthData.seven_day?.resets_at
-          ? new Date(oauthData.seven_day.resets_at).getTime() / 1000
-          : undefined,
-        ageSeconds: 0,
-      };
-    }
-  }
-
-  // 3. No live fetch available: a somewhat older bridge entry still beats a
-  //    guess, but it is labeled with its age so nobody reads it as current.
+  // 3. An older entry still beats a guess, but it is tagged with its age.
   const stale = readUsageCache(configDir, USABLE_MS);
   if (stale) {
     return asBridge(stale);

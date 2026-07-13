@@ -111,7 +111,7 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
 
     const fetchedAt = data.fetchedAt;
     const ageMs = Date.now() - fetchedAt;
-    const stale = ageMs > 10 * 60 * 1000; // >10min
+    const stale = ageMs > 3 * 60 * 1000; // a quota moves fast; 3 min is already old
 
     // Determine source label from cache
     let source: "live" | "est" | "none" = "none";
@@ -127,19 +127,24 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
     let sevenDayPct: number | undefined;
     let sevenDayResetsAt: number | undefined;
 
-    if (data.five_hour) {
-      fiveHourPct = data.five_hour.used_percentage;
-      if (data.five_hour.resets_at) {
-        fiveHourResetsAt = new Date(data.five_hour.resets_at).getTime();
+    // The bridge stores {used_percentage, resets_at_ts (epoch seconds)}. Reading
+    // a non-existent "resets_at" is why every countdown rendered as "-". The
+    // older ISO field is still accepted so an old cache file keeps working.
+    const readSeg = (seg: any): [number | undefined, number | undefined] => {
+      if (!seg) return [undefined, undefined];
+      const pct = seg.used_percentage ?? seg.utilization;
+      let ts: number | undefined;
+      if (typeof seg.resets_at_ts === "number") {
+        ts = seg.resets_at_ts;
+      } else if (seg.resets_at) {
+        const ms = Date.parse(seg.resets_at);
+        if (!Number.isNaN(ms)) ts = Math.round(ms / 1000);
       }
-    }
+      return [pct, ts];
+    };
 
-    if (data.seven_day) {
-      sevenDayPct = data.seven_day.used_percentage;
-      if (data.seven_day.resets_at) {
-        sevenDayResetsAt = new Date(data.seven_day.resets_at).getTime();
-      }
-    }
+    [fiveHourPct, fiveHourResetsAt] = readSeg(data.five_hour);
+    [sevenDayPct, sevenDayResetsAt] = readSeg(data.seven_day);
 
     return {
       source,

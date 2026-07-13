@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert";
-import { mkdirSync, rmSync, readFileSync } from "node:fs";
+import { writeFileSync, mkdirSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -49,11 +49,13 @@ test("realUsage: cache expires past the usable window", async () => {
     five_hour: { used_percentage: 50 },
   };
 
-  writeUsageCache(configDir, staleData);
+  // Plant the file directly: writeUsageCache stamps fetchedAt with the write
+  // time (that is what "when we got this data" means), so it cannot be used to
+  // fabricate an old entry.
+  writeFileSync(cachePath, JSON.stringify(staleData), "utf8");
 
-  // Should return undefined because cache is stale
   const read = readUsageCache(configDir);
-  assert.equal(read, undefined, "stale cache should be ignored");
+  assert.equal(read, undefined, "an entry past the usable window is ignored");
 
   rmSync(testDir, { recursive: true });
 });

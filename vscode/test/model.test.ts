@@ -732,3 +732,27 @@ test("buildTooltipMarkdown: shows no data when source is none", () => {
   assert.ok(md.includes("no data"), "should explicitly say no data");
   assert.ok(!md.includes("0%"), "should not show fake 0%");
 });
+
+test("loadProfileQuota: reads epoch-seconds resets from the bridge", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  const dir = join(tmpDir, "lodestone");
+  mkdirSync(dir, { recursive: true });
+  const resetsAt = Math.floor(Date.now() / 1000) + 3600;
+  writeFileSync(
+    join(dir, "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "statusline",
+      five_hour: { used_percentage: 64, resets_at_ts: resetsAt },
+      seven_day: { used_percentage: 88, resets_at_ts: resetsAt + 86400 },
+    })
+  );
+
+  const q = loadProfileQuota(tmpDir);
+  assert.strictEqual(q.source, "live");
+  assert.strictEqual(q.fiveHourPct, 64);
+  assert.strictEqual(q.sevenDayPct, 88);
+  // The countdown was always "-" because this field was read under the wrong name.
+  assert.strictEqual(q.fiveHourResetsAt, resetsAt);
+  assert.ok(q.sevenDayResetsAt);
+});
