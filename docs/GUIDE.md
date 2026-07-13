@@ -4,6 +4,17 @@
 
 Every expensive moment in Claude Code is a **boundary**: you switch accounts, your 1-hour cache goes cold, a 5-hour or weekly limit resets, or your session gets too bloated to keep. At every one of those, the conversation has to be re-sent to a cache that cannot help you, and that is what shreds your usage window. Lodestone makes the thing that crosses the boundary tiny (a structured handoff instead of the whole conversation), and tells you when to cross while it is still cheap.
 
+## Getting set up
+
+One command, and it walks you through the rest:
+
+```bash
+npm install -g lodestone-cli
+lodestone setup
+```
+
+It asks before each change, verifies each step, and finishes by telling you the one thing it cannot do for you: restart your Claude Code session, because hooks and status lines load when a session starts.
+
 ## The two halves, and how they talk
 
 The **CLI** (npm `lodestone-cli`, command `lodestone`) owns all the logic and all the data. The **extension** is a thin face: it reads the same files and runs the same CLI. There is one brain.

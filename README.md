@@ -67,11 +67,10 @@ Reads your own transcripts and reports every boundary you crossed, what it actua
 
 ```bash
 npm install -g lodestone-cli
-lodestone init                      # wires hooks into Claude Code
-lodestone init --statusline         # adds the live status line
-lodestone config set realUsage on   # real quota numbers, read locally
-lodestone doctor                    # verify everything
+lodestone setup
 ```
+
+`setup` is a guided first run. It finds your Claude install, adopts your existing account, and asks before it changes anything: hooks, the live status line, real quota data, a second account, trail mode. Every step verifies itself, so when it says real usage is on, it has already fetched your real numbers and printed them.
 
 Your existing `~/.claude` is adopted as a profile called `personal`. Nothing is moved, copied or deleted. To add a second account:
 

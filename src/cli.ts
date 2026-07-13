@@ -17,6 +17,7 @@ import { keepalive } from "./commands/keepalive.js";
 import { audit } from "./commands/audit.js";
 import { trail } from "./commands/trail.js";
 import { refresh } from "./commands/refresh.js";
+import { setup } from "./commands/setup.js";
 
 const VERSION = "0.1.0";
 
@@ -38,6 +39,7 @@ const COMMAND_NAMES = new Set([
   "audit",
   "trail",
   "refresh",
+  "setup",
   "help",
 ]);
 
@@ -68,6 +70,12 @@ export async function main(argv: string[]): Promise<number> {
 
     // No command given
     if (!command) {
+      // Check if config file exists; if not, suggest setup
+      const { existsSync } = await import("node:fs");
+      const { lodestoneConfigPath } = await import("./core/paths.js");
+      if (!existsSync(lodestoneConfigPath())) {
+        console.log("Getting started? Run: lodestone setup\n");
+      }
       printGlobalHelp();
       return 2;
     }
@@ -157,6 +165,9 @@ export async function main(argv: string[]): Promise<number> {
       case "refresh":
         return await refresh(commandArgs2, cmdOpts);
 
+      case "setup":
+        return await setup(commandArgs2, cmdOpts);
+
       case "help": {
         const helpCmd = commandArgs2[0];
         if (helpCmd) {
@@ -242,7 +253,7 @@ function parseGlobalArgs(argv: string[]): {
 }
 
 function printGlobalHelp(): void {
-  console.log(`lodestone — switch Claude Code accounts with measured context handoffs
+  console.log(`lodestone - Claude Code usage without the cache tax
 
 Usage: lodestone [--version] [--help] [--json] [--profile <name>] <command> [options]
 
@@ -253,6 +264,7 @@ Global options:
   --profile <name>     Override current profile
 
 Commands:
+  setup                Guided first-run setup
   profile              Manage profiles
   launch               Launch Claude on a profile
   login                Authenticate a profile
@@ -275,6 +287,18 @@ help                   Show command help`);
 
 function printCommandHelp(command: string): void {
   const helps: Record<string, string> = {
+    setup: `lodestone setup — guided first-run setup
+
+Usage: lodestone setup
+
+Interactively configures Claude Code with:
+  • Profile detection and login guidance
+  • Hook installation
+  • Status line configuration
+  • Real usage monitoring
+  • Second account setup (optional)
+  • Trail mode configuration (optional)`,
+
     profile: `lodestone profile — manage profiles
 
 Usage: lodestone profile <subcommand>
