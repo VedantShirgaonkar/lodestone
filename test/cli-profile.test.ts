@@ -130,6 +130,19 @@ test("cli: doctor checks claude on PATH", async () => {
     // Write .claude.json with login info
     await writeFile(resolve(claudeDir, ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "t@example.com", organizationName: "Test Org" } }));
 
+    // doctor now verifies our hooks are actually wired in; a profile without
+    // them is a real setup failure, so plant them for the all-green case.
+    await writeFile(
+      resolve(claudeDir, "settings.json"),
+      JSON.stringify({
+        hooks: {
+          SessionStart: [
+            { matcher: "startup|clear", hooks: [{ type: "command", command: "lodestone hook session-start" }] },
+          ],
+        },
+      })
+    );
+
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: claudeDir } }, settings: {} }));
 

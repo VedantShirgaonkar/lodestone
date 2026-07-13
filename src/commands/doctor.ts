@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { loadConfig } from "../core/config.js";
 import { claudePath, versionOf } from "../core/claudeCli.js";
@@ -228,12 +228,32 @@ export async function doctor(
       // Skip session checks on error
     }
 
-    // 6. Hooks status (Phase 3 feature)
-    checks.push({
-      name: "hooks",
-      status: "ok",
-      message: "not installed (Phase 3 feature)",
-    });
+    // 6. Hooks: are ours actually wired into each profile's settings.json?
+    try {
+      const config = loadConfig();
+      for (const [name, profileCfg] of Object.entries(config.profiles)) {
+        const settingsPath = join(expandTilde(profileCfg.configDir), "settings.json");
+        let installed = false;
+        if (existsSync(settingsPath)) {
+          try {
+            const raw = readFileSync(settingsPath, "utf8");
+            installed = raw.includes("lodestone hook");
+          } catch {
+            installed = false;
+          }
+        }
+        checks.push({
+          name: `hooks (${name})`,
+          status: installed ? "ok" : "FAIL",
+          message: installed
+            ? "session-start, session-end, pre-compact, user-prompt-submit"
+            : "not installed - run: lodestone init",
+        });
+        if (!installed) hasFailure = true;
+      }
+    } catch {
+      // config already reported above
+    }
 
     // Output
     for (const check of checks) {

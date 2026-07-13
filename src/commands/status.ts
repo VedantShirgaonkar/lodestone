@@ -11,6 +11,7 @@ import {
 } from "../core/handoffFile.js";
 import { findProjectRoot } from "../core/paths.js";
 import { progressBar } from "../util/ansi.js";
+import { getQuota } from "../core/realUsage.js";
 import { resolveActingProfile, adoptDefault } from "../core/profiles.js";
 
 interface CommandOptions {
@@ -29,6 +30,15 @@ interface WindowInfo {
   pct: number;
   windowStartIso: string | undefined;
   minutesRemaining: number;
+  /** "live" = Claude Code's real rate_limits; "estimate" = local burn model. */
+  source: "live" | "estimate";
+}
+
+/** 1_561_774 -> "1.6M", 46_200 -> "46.2k" */
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(Math.round(n));
 }
 
 interface ProfileStatus {
@@ -74,26 +84,44 @@ export async function status(
       const profileInfo = { name, configDir, label: profileCfg.label };
       const login = loggedInHint(profileInfo);
 
-      // Calculate window burn
+      // Real quota first (Claude Code's own rate_limits, via the statusline
+      // bridge or the opt-in endpoint). The local burn model is the fallback.
+      const quota = await getQuota(
+        configDir,
+        undefined,
+        config.settings.realUsage ?? false
+      );
+      const hasLive =
+        quota.source !== "estimate" && quota.fiveHourUtilization !== undefined;
+
       const burnResult = await windowBurn(configDir, now);
       const burn = burnResult.burn;
       const windowStartIso = burnResult.windowStartIso;
-      const minutesRemaining = burnResult.minutesRemaining;
-
-      // Calculate as percentage of window
-      const plan = (config.settings as Record<string, unknown>)
-        ?.plan as string | undefined || "pro";
-      const pct = asPctOfWindow(burn, plan as "pro" | "max5" | "max20" | "team");
+      const minutesRemaining = hasLive && quota.fiveHourResetsAt
+        ? Math.max(
+            0,
+            Math.round((quota.fiveHourResetsAt * 1000 - now.getTime()) / 60000)
+          )
+        : burnResult.minutesRemaining;
 
       const window =
-        burn === 0 && minutesRemaining === 0
-          ? null
-          : {
+        hasLive
+          ? {
               burn,
-              pct,
+              pct: Math.round(quota.fiveHourUtilization ?? 0),
               windowStartIso,
               minutesRemaining,
-            };
+              source: "live" as const,
+            }
+          : burn === 0 && minutesRemaining === 0
+            ? null
+            : {
+                burn,
+                pct: 0, // deliberately unused: see the render, we never fake a %
+                windowStartIso,
+                minutesRemaining,
+                source: "estimate" as const,
+              };
 
       // Get recent sessions (< 24h, cap 3)
       const sessions = getRecentSessions(configDir, now);
@@ -147,8 +175,22 @@ export async function status(
         );
 
         if (profile.window) {
-          const bar = progressBar(profile.window.pct, 100, 22);
-          console.log(`  5h window: ${bar} est`);
+          // A percentage is only shown when it comes from Claude Code's real
+          // rate_limits feed. The local burn model cannot be honestly expressed
+          // as a percentage of a plan we are guessing at: on a heavy session it
+          // produces absurdities like 9297%. So without live data we report what
+          // we actually measured, and say how to get the real number.
+          if (profile.window.source === "live") {
+            const bar = progressBar(profile.window.pct, 100, 22);
+            console.log(`  5h window: ${bar} live`);
+          } else {
+            console.log(
+              `  5h window: ~${formatTokens(profile.window.burn)} weighted tokens used (estimate)`
+            );
+            console.log(
+              `             for real quota %, run: lodestone init --statusline`
+            );
+          }
           if (profile.window.windowStartIso) {
             console.log(
               `  started ${formatDate(profile.window.windowStartIso)}, ~${profile.window.minutesRemaining}m left`

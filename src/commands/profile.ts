@@ -1,7 +1,7 @@
 import { mkdir, readdir } from "node:fs/promises";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
-import { addProfile, removeProfile, currentProfile } from "../core/profiles.js";
+import { addProfile, removeProfile, currentProfile, loggedInHint } from "../core/profiles.js";
 import { loadConfig, saveConfig } from "../core/config.js";
 import { expandTilde } from "../core/paths.js";
 
@@ -98,17 +98,11 @@ async function profileList(): Promise<number> {
           }
         }
 
-        let loginStatus = "not logged in";
-        try {
-          const claudeJsonPath = resolve(configDir, ".claude.json");
-          const fs = await import("node:fs/promises");
-          const claudeJson = JSON.parse(await fs.readFile(claudeJsonPath, "utf-8"));
-          if (claudeJson.oauthAccount) {
-            loginStatus = "logged in";
-          }
-        } catch {
-          // Not logged in
-        }
+        // Use the shared resolver: the default ~/.claude profile keeps
+        // .claude.json as a SIBLING, not inside the config dir. Re-implementing
+        // this check here is what made `profile list` claim "not logged in"
+        // while `doctor` reported the account correctly.
+        const loginStatus = loggedInHint({ name, configDir });
 
         console.log(
           `${marker} ${name.padEnd(15)} ${configDir.padEnd(40)} ${loginStatus.padEnd(15)} ${sessionCount} sessions`

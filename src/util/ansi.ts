@@ -38,8 +38,12 @@ export function progressBar(
   max: number,
   width: number = 20
 ): string {
-  const filled = Math.round((current / max) * width);
+  // Estimates legitimately exceed 100% (a marathon session can blow past a
+  // plan-window budget), so the bar fill must be clamped. Without this,
+  // "░".repeat(negative) throws and takes the whole command down.
+  const pct = max > 0 ? (current / max) * 100 : 0;
+  const filled = Math.min(width, Math.max(0, Math.round((pct / 100) * width)));
   const empty = width - filled;
   const bar = "█".repeat(filled) + "░".repeat(empty);
-  return `[${bar}] ${Math.round((current / max) * 100)}%`;
+  return `[${bar}] ${Math.round(pct)}%`;
 }
