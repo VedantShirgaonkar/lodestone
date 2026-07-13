@@ -75,5 +75,5 @@ Configured in `settings.json` (user `~/.claude/settings.json` — i.e. **per con
 - https://code.claude.com/docs/en/statusline
 - https://code.claude.com/docs/en/costs
 - https://code.claude.com/docs/en/authentication
-- Local observation on this machine (`~/.claude`, transcripts v2.1.170–2.1.206) — see 05-local-ground-truth.md
+- Local observation of real transcripts (`~/.claude`, Claude Code v2.1.170 to v2.1.206). Everything above was confirmed against live session files before it was relied on.
 - Community: fortunto2 keychain-switcher gist; melkon.tech; daring-designs; joshcgrossman (Windows caveats); KMJ-007 gist

@@ -1,6 +1,6 @@
 # ADR-012: Generalize to all context-carry boundaries — trail mode, refresh flow, advisor escalation, audit classes
 
-**Status:** accepted · 2026-07-12 · Basis: docs/research/07-context-carry-economics.md (user + user's-friend input, verified economics)
+**Status:** accepted · 2026-07-12 · Basis: docs/research/05-context-carry-economics.md (verified economics)
 
 ## Context
 The product handled one boundary well (account switch) while the same machinery — capture → small handoff → fresh-context injection — is what every Claude Code user needs at *every* boundary: cache expiry, 5h/weekly walls, voluntary context shed, machine moves. The friend's "running session log" pattern exposed our one real hole: all our quality capture paths require a live, un-throttled session, so a wall that lands mid-work degrades us to the dumb snapshot.

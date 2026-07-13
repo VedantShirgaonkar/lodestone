@@ -3,7 +3,7 @@
 **Status:** accepted · 2026-07-10
 
 ## Context
-Two ways to switch accounts: `/login` inside one config dir (what the user did — shared history, but each switch orphans the other org's cache mid-conversation and invites accidental mid-session switches), or separate config dirs via `CLAUDE_CONFIG_DIR` (community-standard). Keychain entries are keyed by sha256(config dir) on macOS; `.credentials.json` lives inside the dir on Linux/Windows — so config-dir separation isolates auth completely.
+Two ways to switch accounts: `/login` inside one config dir (the obvious approach, and what most people start with: shared history, but each switch orphans the other org's cache mid-conversation and invites accidental mid-session switches), or separate config dirs via `CLAUDE_CONFIG_DIR` (community-standard). Keychain entries are keyed by sha256(config dir) on macOS; `.credentials.json` lives inside the dir on Linux/Windows — so config-dir separation isolates auth completely.
 
 ## Decision
 - One profile = one config dir. Registry in `~/.config/lodestone/config.json`.

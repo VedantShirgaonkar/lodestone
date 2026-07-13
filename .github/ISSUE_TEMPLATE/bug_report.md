@@ -1,37 +1,54 @@
 ---
 name: Bug report
-about: Report an unexpected behavior or error
+about: Report unexpected behavior or an error
 title: "[BUG] "
 labels: bug
 assignees: ""
 ---
 
 ## Description
-Brief description of the issue.
+
+Brief description of what went wrong.
 
 ## Steps to reproduce
+
 1. Run `lodestone [command]`
-2. ...
+2. (specific steps)
 3. See error
 
 ## Expected behavior
+
 What should have happened.
 
 ## Actual behavior
-What actually happened (output, error message, etc.).
+
+What actually happened (output, error message, state of the system).
 
 ## Environment
-- Output of `lodestone doctor`:
-```
-[paste doctor output here]
+
+Include the exact output of these commands (copy and paste, do not summarize):
+
+```bash
+lodestone doctor
+claude --version
+node --version
 ```
 
-- OS & version: (e.g., macOS 14.0)
-- Node version: (run `node --version`)
-- Claude Code version: (run `claude --version`)
+OS and version (e.g., macOS 14.0, Ubuntu 22.04, Windows 11):
 
 ## Logs
-Relevant content from `~/.config/lodestone/lodestone.log` (if available).
+
+Relevant content from `~/.config/lodestone/lodestone.log` (if available). Copy the excerpt that corresponds to the timestamp when the error occurred.
+
+## Privacy
+
+Do not paste:
+- Contents of real Claude Code transcripts or session files
+- Credentials, API keys, or authentication tokens
+- Real profile names if they contain sensitive information
+
+If you need to share transcript content, sanitize it or create a synthetic example.
 
 ## Additional context
-Any other context (e.g., does `lodestone doctor` pass? which profile? any custom config?)
+
+Anything else relevant: which profile you were using, whether `lodestone doctor` passes, any custom config in `~/.config/lodestone/config.json`, etc.

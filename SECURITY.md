@@ -36,13 +36,13 @@ The `config set realUsage on` option reads your own OAuth access token and queri
 
 **Explicit guardrails:**
 - Token is read only from local storage (Keychain or credentials.json) you control
-- Endpoint is `api.anthropic.com/api/oauth/usage` only — no other hosts
+- Endpoint is `api.anthropic.com/api/oauth/usage` only. No other hosts, ever.
 - Responses are cached ≥180 seconds with file locking (minimize polling)
 - Failures gracefully degrade to JSONL estimation (never required)
 - No retry-storm on 429; max one retry then stop
 - `User-Agent: claude-code/<version>` required (community convention, avoids aggressive rate-limiting)
 
-**Risk:** This endpoint is undocumented (like community tools use) — Anthropic may change or deprecate it. If it breaks, the feature degrades to estimates; the CLI keeps working.
+**Risk:** This endpoint is undocumented, as it is for the community tools that use it, so Anthropic may change or deprecate it. If it breaks, the feature degrades to estimates and the CLI keeps working.
 
 ## Threat model: what could go wrong
 
@@ -61,7 +61,7 @@ The `config set realUsage on` option reads your own OAuth access token and queri
 Please report security vulnerabilities responsibly:
 
 1. **Do not** open a public GitHub issue
-2. Email security details to: [maintainer email — to be filled on publish]
+2. Email security details to: vedxntshirgaonkar@gmail.com
 3. Include: affected version, reproduction steps, impact
 4. Allow 30 days for a patch before public disclosure
 
@@ -87,7 +87,7 @@ Opt-in OAuth is the only place where a network call happens, and it's explicit, 
 ## Scope & limitations
 
 - This tool cannot and does not attempt to protect against: malicious Claude Code plugins, local machine compromise, stolen Keychain passwords, leaked oauth tokens, or deliberate ToS violation
-- Nor does it attempt to enforce any Anthropic policies — that's between you and Anthropic
+- Nor does it attempt to enforce any Anthropic policy. That is between you and Anthropic.
 - It's a measurement and routing tool for your own accounts on your own machine
 
 ## Updates & security patches

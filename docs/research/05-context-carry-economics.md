@@ -1,6 +1,6 @@
 # Research: The Economics of Context Carry — trail vs handoff vs /compact vs continue
 
-> 2026-07-12. Triggered by the user's friend's "running session log" pattern (VESTIGE RULES.md §5: a continuously maintained per-session context file, updated after every significant decision/work block; a new session reads the latest log and resumes). This doc answers: is that pattern efficient, how does it relate to what we built, and what is the optimal integration? All weights per research/02 (`read 0.1× · uncached 1× · 1h write 2× · output ~5×`).
+> 2026-07-12. A common community pattern is the "running session log": a context file the model keeps current as it works, updated after every significant decision or block of work, so a new session can read the latest entry and resume. This doc asks whether that pattern is actually efficient, how it compares to a handoff and to native `/compact`, and where each one wins. All weights per research/02 (`read 0.1× · uncached 1× · 1h write 2× · output ~5×`).
 
 ## 0. The unifying frame: boundaries
 
@@ -52,19 +52,19 @@ Where /compact structurally loses and we win:
 
 ## 4. The integrated design (what changes in the product)
 
-**Capture ladder (revised):**
-- T0 **trail mode** (NEW, opt-in): continuous bounded trail + staleness nudges. Insurance against B3.
-- T1 `/handoff` on demand (exists) — cheapest good capture when the boundary is chosen.
-- T2 `--distill` (exists) — post-hoc within TTL.
-- T3 deterministic auto-snapshot (exists) — floor; **now ALSO fired automatically at the 95% advisor threshold** (NEW), so even without trail mode a surprise wall never finds us empty-handed.
+**The capture ladder.** Four ways to get context out of a session, in descending order of quality and ascending order of certainty that something exists at all:
+- **T0 trail mode** (opt-in): a bounded trail the model keeps current as it works, plus staleness nudges. Insurance against B3, the boundary you do not choose.
+- **T1 `/handoff` on demand**: the cheapest good capture when *you* choose the boundary, because the model still remembers everything and the cache is warm.
+- **T2 `--distill`**: post-hoc, still inside the TTL, at cache-read prices.
+- **T3 deterministic auto-snapshot**: the floor. Free, hook-driven, no model call. Also fired automatically at the 95% advisor threshold, so even with trail mode off, a surprise wall never finds you empty-handed.
 
-**Carry moves (one mechanism, three fronts):** `switch <profile>` (B1, exists) · **`refresh`** (B2/B4: write handoff → `/clear` → hook injects; NEW skill + advisor copy; the machinery — clear-matcher injection — already exists) · post-reset resume (B3: just start a session; startup injection already works — NEW advisor copy at ≥95%: "snapshot saved; after reset, start fresh here and it loads automatically").
+**Carry moves: one mechanism, three fronts.** `switch <profile>` crosses B1. `refresh` handles B2 and B4 (write a handoff, `/clear`, the start hook injects it back). Post-reset resume handles B3, and needs nothing new: you just start a session and the waiting handoff loads itself.
 
-**Advisor escalation (NEW):** 85% → nudge trail/handoff (cache warm, cheap). 95% → fire deterministic snapshot inline + wall-imminent message with the post-reset instruction. Cache-expiry countdown stays on statusline/dash; the VS Code extension (timer-driven, unlike hooks) additionally gets a T-minus toast option before a warm cache dies (NEW) — the only surface that can warn during idle.
+**Advisor escalation.** At 85% the cache is still warm and a handoff is still cheap, so it nudges. At 95% it stops asking and banks a deterministic snapshot inline, then tells you what to do after the reset. The cache-expiry countdown lives on the statusline and dash; the editor extension, being timer-driven rather than hook-driven, is the only surface that can also warn you while you are idle, which is exactly when a warm cache dies unnoticed.
 
-**Keepalive guardrail** aligned to the user's spec: pings only while the source profile's 5h window is below a configurable ceiling (default raised check: skip at ≥80% used, i.e. run only when meaningful headroom remains; configurable `keepalive.maxWindowPct`).
+**Keepalive guardrail.** Pings run only while the source profile's 5h window is below a ceiling (skip at ≥80% used, configurable via `keepalive.maxWindowPct`), so keeping a cache warm can never be the thing that spends the window you were saving.
 
-**Audit classes (NEW):** every consumption event classified `switch` (consumer profile ≠ source) or `refresh` (same profile — stop rejecting these when they come from explicit consumedBy records; keep rejecting same-profile *heuristic* pairs) plus `post-reset` (same profile, consumed after a window boundary). Savings reported per class — giving the user their "how much did we save across same session, new session, resets, switches" view in status/dash/extension.
+**Audit classes.** Every consumption event is classified `switch` (consumer profile differs from source), `refresh` (same profile, session shed deliberately), or `post-reset` (same profile, consumed after a window boundary). Savings are reported per class, which is what turns "it feels cheaper" into a number per kind of crossing.
 
 ## 5. What we explicitly do NOT do (scope honesty, per the user's directive)
 

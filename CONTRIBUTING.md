@@ -1,220 +1,128 @@
 # Contributing to lodestone
 
-Thank you for your interest in contributing! This document covers development setup, testing expectations, and the design philosophy behind the codebase.
+## Setup
 
-## Philosophy
+Prerequisites: Node >= 20, npm, and a local clone of the repo.
 
-- **Zero runtime dependencies** — every new feature must not introduce an npm dependency (ADR-004). Test this with `npm ls --production`.
-- **No credentials in tests** — fixtures must be synthetic, never copy-pasted from real transcripts (privacy rule).
-- **Hooks must fail safely** — hook code paths must always exit 0 and finish <2s, even on errors (errors logged, not printed).
-- **All token spend is opt-in** — any code path that calls the Claude API must be behind an explicit flag and print its estimated cost first (ADR-003).
-- **Tests drive acceptance** — new features are proven by integration tests, not just unit tests; use the real JSONL schema and fixture transcripts.
-
-## Development setup
-
-### Prerequisites
-- Node ≥20
-- npm (comes with Node)
-- macOS, Linux, or WSL (native Windows may work but is best-effort)
-- A local clone of this repo
-
-### Install & build
 ```bash
-git clone https://github.com/TODO(owner)/lodestone
+git clone https://github.com/VedantShirgaonkar/lodestone
 cd lodestone
-npm ci                # clean install
-npm run build         # tsc to dist/
-npm test              # run all tests
+npm ci
+npm run build
+npm test
 ```
 
-### Directory layout
-```
-bin/                  CLI entry point
-src/
-  cli.ts              main dispatch
-  commands/           lodestone subcommands (profile, switch, status, etc.)
-  core/               business logic (profiles, transcripts, usage, handoff extraction)
-  util/               helpers (logging, ANSI colors, paths, JSONL parsing)
-test/
-  *.test.ts           test files (one per module)
-  fixtures/           synthetic JSONL transcripts and configs
-dist/                 compiled JavaScript (gitignored)
-dist-test/            test build with fixtures copied (gitignored)
-docs/                 user docs, research, ADRs, architecture
-skills/               Claude skills (handoff/)
-scripts/              utility scripts (smoke-real.mjs, measure-switch.ts)
-```
+## Directory layout
+
+- `bin/` - CLI entry point
+- `src/cli.ts` - main dispatch
+- `src/commands/` - subcommands (profile, switch, status, audit, etc.)
+- `src/core/` - business logic (profiles, transcripts, usage, handoff extraction)
+- `src/util/` - helpers (logging, ANSI, paths, JSONL parsing)
+- `test/` - test files (Node's built-in `--test` runner, no vitest/jest)
+- `test/fixtures/` - synthetic JSONL transcripts and configs
+- `docs/` - user docs, research, ADRs, architecture
+- `vscode/` - companion extension source
+- `skills/` - Claude skills (handoff/)
+
+## Non-negotiable rules
+
+- **Zero runtime dependencies** (ADR-004). Every feature must work with only TypeScript and Node built-ins. Test with `npm ls --production`. Why: smaller attack surface, auditable supply chain, faster installs.
+- **Synthetic fixtures only** (privacy rule). Never copy real transcripts or credentials into `test/fixtures/`. Why: audit trails and real data are sensitive.
+- **Hooks exit cleanly** (ADR-002). Hook code paths must always exit 0, finish under 2s, and log errors to `~/.config/lodestone/lodestone.log`, never stderr. Why: a hook failure must never break the user's session.
+- **Token spend is opt-in** (ADR-003). Any code path that calls Claude must be behind an explicit flag and print the estimated cost first. Why: users control their API budget.
+- **Estimates are labeled** (ADR-007). All usage figures from local heuristics must say `est`. Real figures come from live quota or audit. Why: no broken promises.
 
 ## Testing
 
-### Run tests
 ```bash
 npm test              # build + test
 npm run build         # build only
 ```
 
-Tests use Node's built-in `--test` runner (no vitest/jest dependencies). See `.test.ts` files for examples.
+Tests use Node's `--test` runner. See existing `.test.ts` files for examples. Tests can mock session parsing or build fixture JSON inline.
 
-### Test fixtures: the privacy rule
-
-**NEVER copy real transcripts into fixtures.** Fixtures must be synthetic:
-
-- Use `test/fixtures/session-small.jsonl` as a template: hand-built, small, covers the schema
-- If you need a specific edge case (compact summary, sidechain, certain usage patterns), extend an existing fixture
-- Never paste a real `~/.claude/projects/*/session*.jsonl` into the repo
-- Comment why each fixture exists (`// Tests X behavior with Y tokens`)
-
-Tools to generate fixtures:
-```bash
-# View the real JSONL schema (private; for reference)
-jq . ~/.claude/projects/*/session*.jsonl | head -50
-
-# In tests, you can mock session parsing or build fixture JSON inline
-```
-
-### Integration tests
-Some tests need to run the CLI against temp directories with fake setups. Pattern:
+Integration tests can spawn the CLI against temp directories with fake profiles:
 
 ```typescript
 import { tmpdir } from "node:os";
 import { mkdtempSync } from "node:fs";
-import { spawn } from "node:child_process";
 
-test("switch command orchestrates handoff", async (t) => {
+test("switch command works", async (t) => {
   const tempCfgDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   // Set up fake profiles in tempCfgDir
   // Run: CLAUDE_CONFIG_DIR=tempCfgDir node dist/cli.js switch work
-  // Assert output and side effects
+  // Assert output
 });
 ```
 
-### Child-process stdin rule
-When spawning Claude (`launcher`, `distill`, etc.) in tests, use `LODESTONE_CLAUDE_BIN=test/fake-claude.sh` env var (or mock via `claudeCli` injectable I/O). Never actually run `claude` in tests unless explicitly validating real-world behavior.
-
-`test/fake-claude.sh` can be environment-scripted (e.g., `FAKE_CLAUDE_EXIT=0 FAKE_CLAUDE_OUTPUT="..."`) for controlled responses.
-
-### Snapshot & golden-file tests
-Use for deterministic output (e.g., handoff markdown, status JSON):
-
-```typescript
-test("extract produces stable output", async (t) => {
-  const result = extractSnapshot(parsed, { cwd });
-  t.match(result.markdown, /Goal:/);  // regex match
-  // Or: golden file with t.matchSnapshot() or explicit assertion
-});
-```
-
-Update snapshots only when intentional (e.g., feature change). Include snapshot files in commits so reviewers can see diffs.
+When spawning Claude in tests, use the `LODESTONE_CLAUDE_BIN=test/fake-claude.sh` env var or injectable I/O mocks. Never run the real `claude` unless explicitly validating real-world behavior.
 
 ## Code organization
 
-### Pure logic vs. I/O
-- `src/core/` — pure functions, no I/O at module level, dependency injection for file read/CLI calls
-- `src/commands/` — CLI handlers; call core logic, handle errors, format output
-- `src/util/` — helpers; logging, ANSI, path munging
+- `src/core/` - pure functions, no module-level I/O, dependencies injected for file read/CLI calls
+- `src/commands/` - CLI handlers, call core logic, format output, handle errors
+- `src/util/` - helpers for logging, ANSI colors, path resolution, JSONL parsing
 
 Example:
+
 ```typescript
-// core/extract.ts — pure
+// core/extract.ts: pure logic
 export function extractSnapshot(parsed: ParsedSession, { cwd }): SnapshotData {
   return { goal: ..., files: ... };
 }
 
-// commands/snapshot.ts — I/O and dispatch
+// commands/snapshot.ts: I/O and dispatch
 const parsed = await parseSession(sessionPath);
 const snapshot = extractSnapshot(parsed, { cwd });
 fs.writeFileSync(outputPath, markdown);
 ```
 
-### Error handling
-- Commands: catch, log, return exit code (1 error, 2 usage)
-- Hooks: always exit 0, log errors to lodestone.log (never print to stderr in a hook context)
-- Core logic: throw on programming errors; return Result type (or maybe-null) for user-facing failures
-- JSONL parsing: never throw on malformed lines; yield `{ error: "...", lineNo: N }`
+Error handling: Commands catch, log, and return exit codes (1 for error, 2 for usage). Hooks always exit 0 and log errors. Core logic throws on programming errors or returns Result types for user-facing failures. JSONL parsing never throws on malformed lines; yield `{ error: "...", lineNo: N }`.
 
-## Commit style
+## Commits and PRs
 
-- **Conventional** (preferred): `feat: add keepalive scheduler` / `fix: audit heuristic off-by-one`
-- **Imperative**: describe what the commit does, not what it did
-- **Atomic**: one logical change per commit (can be multiple files)
-- **Tests first**: add test(s) before or with the feature
-- **Sign-off optional** but link issues: `Fixes #42`
+Prefer conventional style: `feat: add keepalive scheduler` or `fix: audit off-by-one`. Describe what the commit does (imperative). One logical change per commit. Tests first. Link issues: `Fixes #42` or `Refs ADR-007`.
 
 Example:
+
 ```
 feat: implement real-usage OAuth bridge
 
 - Add core/realUsage.ts with getQuota() and opt-in token fetch
 - Statusline writes usage-cache.json for hook consumption
-- Fallback to JSONL estimates if endpoint unavailable or 429
+- Fallback to JSONL estimates if endpoint unavailable
 - Tests: fixture endpoint mock, cache round-trip, degrade behavior
 
 Refs ADR-007
 ```
 
-## Acceptance criteria for PRs
+## PR acceptance criteria
 
-1. ✅ `npm test` 100% green (no skipped tests)
-2. ✅ No new runtime dependencies (verify `npm ls --production`)
-3. ✅ Fixture privacy: no real transcripts copied
-4. ✅ Hook paths exit 0 (test with `hook --self-test` if applicable)
-5. ✅ All estimates labeled `est` / all real data sourced
-6. ✅ Commands have `--help` and `--json` support where relevant
-7. ✅ Integration test if the feature touches CLI or filesystem
-8. ✅ Doc link in code (ADR, research, ARCHITECTURE) where decisions are referenced
+1. `npm test` passes (no skipped tests)
+2. No new runtime dependencies (`npm ls --production` unchanged)
+3. Fixtures are synthetic (no real transcripts copied)
+4. Hook paths exit 0 (test with `--self-test` if applicable)
+5. Estimates labeled `est`, real data sourced and cited
+6. Commands have `--help` and `--json` support where relevant
+7. Integration test added if CLI or filesystem touched
+8. Code links to ADR, research, or ARCHITECTURE where decisions are referenced
 
-## Running against real data (after v0.1)
+## Running against your own data
 
-The `scripts/smoke-real.mjs` script and Phase 7's `measure-switch.ts` protocol allow running the tool against your own accounts for validation. These are **not** required in CI or in dev testing; they're a separate, user-initiated step for live validation.
+After setup, you can test against your real profiles safely:
 
-If you're testing a fix against real data:
 ```bash
-lodestone doctor                      # sanity check your setup
-lodestone status                      # see live metrics
-lodestone profile list                # verify profiles
-# Now test the specific command
-lodestone switch work --stay          # example test command
+lodestone doctor                    # verify everything is wired
+lodestone status                    # see live metrics
+lodestone profile list              # check profiles exist
+# Now test the specific command you're working on
+lodestone switch work --dry-run     # example
 ```
 
-## Performance & resource use
+Before opening a PR, read:
+- `docs/ARCHITECTURE.md` for component contracts
+- `docs/decisions/ADR-*.md` for design context
+- `docs/research/` for verified facts about Claude Code internals
 
-- **Startup**: `lodestone --version` should respond <100ms
-- **Hooks**: <2s (hard limit; monitor via `lodestone.log`)
-- **CLI commands**: <5s for status/audit (network wait may apply if fetching real usage)
-- **Dashboard refresh**: 2s (configurable)
-- **Log rotation**: 1MB max, one backup (2MB total on disk)
-
-Profile with:
-```bash
-time lodestone status                # wall-clock time
-strace -c node bin/lodestone.js ...  # syscall breakdown (Linux)
-```
-
-## Feature checklist
-
-Before proposing a major feature:
-
-1. **Is it a clear win for one of the core flows?** (handoff quality, cross-account workflow, measurement)
-2. **Can it be implemented with zero new dependencies?** (yes → proceed; no → request exception)
-3. **Does it need a hook?** If yes, design with <2s execution and 0-exit.
-4. **Is there an ADR for it?** Check `docs/decisions/` first; if no, ADR is required before code.
-5. **Can it be tested without hitting the real Claude API?** (fixtures, mocks, etc.)
-6. **Is the cost model clear?** (free, or behind `--opt-in` with printed estimate)
-
-## Reporting bugs
-
-Include:
-- `lodestone doctor` output
-- `claude --version` output
-- Your OS and Node version
-- Exact steps to reproduce
-- Relevant transcript excerpt or fixture data (no real credentials)
-
-## Questions?
-
-- Read `docs/ARCHITECTURE.md` for component contracts
-- Read `docs/decisions/ADR-*.md` for design context
-- Check `docs/research/` for ground truth (on Claude Code internals, API behavior)
-- Open an issue for clarification
-
-Thank you for contributing! 🙏
+Questions? Open an issue.

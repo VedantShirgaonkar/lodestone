@@ -2,7 +2,7 @@
 
 ## The delivery form: an npm CLI package that installs its own integrations
 
-This is **not** an MCP server and **not** a VS Code extension (one is planned — see last section). It is a single **command-line program distributed on npm** (`npm install -g …`), zero runtime dependencies. You run it once to set things up; after that it mostly works *through Claude Code itself*, because the setup step plugs three small integrations into Claude Code's official extension points:
+This is **not** an MCP server. It is a single **command-line program distributed on npm** (`npm install -g lodestone-cli`), with zero runtime dependencies, plus a companion editor extension that is a thin client over it. You run the CLI once to set things up; after that it mostly works *through Claude Code itself*, because the setup step plugs three small integrations into Claude Code's official extension points:
 
 ```
                      ┌─────────────────────────────────────────┐
@@ -18,15 +18,15 @@ This is **not** an MCP server and **not** a VS Code extension (one is planned �
               │              INSIDE EVERY CLAUDE CODE SESSION             │
               │                                                           │
               │  ① HOOKS (automatic, invisible)                           │
-              │     · session start → injects your latest handoff        │
-              │     · session end / pre-compact → free auto-snapshot     │
-              │     · every prompt → advisor checks your quota           │
-              │  ② SKILL — type /handoff, Claude writes the handoff file  │
-              │  ③ STATUSLINE — live bar: quota % · cache timer · advice  │
+              │     · session start → injects your latest handoff         │
+              │     · session end / pre-compact → free auto-snapshot      │
+              │     · every prompt → advisor checks your quota            │
+              │  ② SKILL: type /handoff, Claude writes the handoff file   │
+              │  ③ STATUSLINE: live bar, quota % · cache timer · advice   │
               └───────────────────────────────────────────────────────────┘
 ```
 
-So: **package on the outside, built-in Claude Code features on the inside.** After `init`, a normal day needs almost no terminal commands — the statusline shows state, the advisor tells you when to act, `/handoff` is typed inside the chat, and only the actual account switch is a terminal command (because switching accounts means starting a new Claude process — nothing inside a session can do that).
+So: **package on the outside, built-in Claude Code features on the inside.** After `init`, a normal day needs almost no terminal commands. The statusline shows state, the advisor tells you when to act, `/handoff` is typed inside the chat, and only the actual account switch is a terminal command, because switching accounts means starting a new Claude process and nothing inside a session can do that.
 
 ## What problem it solves (30 seconds)
 
@@ -39,11 +39,13 @@ So: **package on the outside, built-in Claude Code features on the inside.** Aft
  │ conversation,  │ ─────► │ ALL 150k    │    │ conversation   │ hand-  │ handoff,    │
  │ cheap (cache)  │        │ from zero   │    │ → snapshot     │ off ─► │ starts lean │
  └────────────────┘        └─────────────┘    └────────────────┘        └─────────────┘
-                            ≈ 40–80% of a                                ≈ 96% cheaper
-                            5-hour window                                (measured)
+                            ≈ 40-80% of a                                ≈ 85% cheaper
+                            5-hour window                                at this size
 ```
 
-Anthropic's prompt cache is sealed per account (server-side, by design — verified in `research/01`). Nothing can carry the cache across. What crosses instead is a small structured **handoff file**: goal, state, decisions, files in play, next steps.
+The saving grows with the conversation: the naive path costs `2 x context`, which climbs all session, while the handoff path costs `2 x (preamble + handoff)`, which does not. At 150k context that is about 85% less; at 450k it is about 95%. See [EVALUATION.md](EVALUATION.md) for the model, the worked example, and what it does not prove.
+
+Anthropic's prompt cache is sealed per account (server-side, by design, verified in `research/01`). Nothing can carry the cache across. What crosses instead is a small structured **handoff file**: goal, state, decisions, files in play, next steps.
 
 ## Where things live on disk
 
@@ -63,7 +65,7 @@ Anthropic's prompt cache is sealed per account (server-side, by design — verif
  you: /handoff  (or automatic snapshot at session end)
         │
         ▼
- .claude/handoff/latest.md  ←── quality-scored, ~1–2k tokens
+ .claude/handoff/latest.md  <-- quality-scored, ~1-2k tokens
         │
  you: `<tool> switch work`  ── prints real cost comparison first
         │                      (e.g. 931k naive vs 42k with handoff)
@@ -98,8 +100,8 @@ Anthropic's prompt cache is sealed per account (server-side, by design — verif
 
 ## Trust properties (why it's safe to run)
 
-- Zero runtime dependencies — the whole supply chain is the source you can read.
-- Never stores, copies, or transmits credentials. The optional "real usage" mode reads your own token locally, asks Anthropic's usage endpoint over TLS, and nothing else — off by default.
+- Zero runtime dependencies. The whole supply chain is source you can read.
+- Never stores, copies, or transmits credentials. The optional "real usage" mode reads your own token locally, asks Anthropic's usage endpoint over TLS, and does nothing else. It is off by default.
 - Hooks can never break a session: every path exits cleanly in under ~2s; failures go to a log file.
 - Anything that would spend tokens says its estimated cost first and requires an explicit flag.
 - Every number it shows is either real (labeled `live`) or an estimate (labeled `est`).
@@ -110,6 +112,6 @@ Anthropic's prompt cache is sealed per account (server-side, by design — verif
 |---|---|---|
 | Claude Code CLI (terminal) | ✅ | statusline + advisor + `/handoff` inside the session; CLI commands outside |
 | Claude Code **VS Code extension** | ✅ same engine | hooks, the `/handoff` skill, and the advisor work identically there (it's the same Claude Code core); terminal commands run in the integrated terminal |
-| Dedicated **VS Code companion extension** | ✅ built | native status-bar quota item (5h/weekly %, live/est labels, warning when crossing thresholds), tooltip popover with per-profile bars & resets, cache countdown, savings, and QuickPick menu for Handoff & Switch, Keep Warm, Dashboard, Refresh — no terminal needed |
+| Dedicated **editor extension** | ✅ shipped on Open VSX | native status-bar quota item (5h/weekly %, live/est labels, warning when crossing thresholds), tooltip popover with per-profile bars and resets, cache countdown, savings, and a QuickPick menu for Handoff and Switch, Keep Warm, Dashboard, Refresh. No terminal needed. |
 
 The companion extension stays thin by design: it reads the same data files and shells out to the same CLI, so there is exactly one brain and several faces.

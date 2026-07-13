@@ -1,51 +1,79 @@
-# Evaluation: Does lodestone actually kill the switch tax?
+# Evaluation: is the saving real?
 
-Methodology for validating the core claim — that a handoff switch costs an order of magnitude less than a naive account switch — plus the live protocol and a results section to be filled during Phase 7 validation.
+Lodestone claims that crossing a boundary with a handoff costs an order of magnitude less than crossing it naively. This document says exactly what that claim means, how it is computed, how you reproduce it on your own data, and what it does not prove. If you only read one section, read "What this does not prove".
 
-## What we measure
+## The unit: weighted tokens
 
-All measurements come from transcript JSONL `usage` fields (ground truth for what the API processed) and, where available, real `rate_limits` percentages before/after. Weighted tokens = `input×1 + cache_creation×2 + cache_read×0.1 + output×5` (research/02).
+Not all tokens cost the same, so counting raw tokens tells you nothing useful about what a boundary cost. Anthropic's published cache pricing gives the weights:
 
-**Primary metric — first-turn transfer cost on the target account:**
-- Naive arm: continue the same conversation on account B (historically via `/login`, or by replaying context). First-turn `cache_creation_input_tokens + input_tokens` ≈ 2×C weighted.
-- Handoff arm: fresh session on B with injected handoff. First-turn cost ≈ 2×(S+H) where S = fixed preamble, H = handoff size.
+```
+weighted = input×1  +  cache_creation×2  +  cache_read×0.1  +  output×5
+```
 
-**Secondary metrics:** (a) compounding — mean per-turn weighted cost over the next 10 turns on B (the naive arm drags C into every turn); (b) real quota delta — `five_hour.used_percentage` before/after each arm when rate_limits available; (c) handoff quality score and a subjective "did Claude continue correctly without re-explaining?" (1–5, user-judged); (d) keepalive validation — a ping turn must show `cache_read ≈ C`, `cache_creation` ≈ small, all writes in `ephemeral_1h`.
+Every number lodestone reports is in this unit. It comes from the `usage` object on each assistant message in the transcript JSONL, which is ground truth for what the API actually processed, not an estimate of what we think it processed. See [research/01-prompt-caching.md](research/01-prompt-caching.md) for where the weights come from and [research/02-usage-limits.md](research/02-usage-limits.md) for how they map onto your usage window.
 
-## Expected numbers (from research, to be confirmed)
+## What a boundary costs
 
-At C = 150k context, S ≈ 20k, H ≈ 1.5–2.5k:
+Let `C` be the conversation's current context size, `S` the fixed session preamble (system prompt, CLAUDE.md, tool definitions), and `H` the handoff size.
 
-| Arm | First turn on B (weighted) | Predicted |
-|---|---|---|
-| Naive continue/replay | ≈ 300k | 40–80% of a Pro 5h window |
-| Handoff switch | ≈ 43–45k | ~85–90% cheaper |
-| Handoff + small C growth over 10 turns | — | compounding savings > first-turn savings |
+**Naive crossing.** The conversation is re-sent to a cache that cannot help it, so the whole of `C` is written fresh at the 2x cache-write weight:
 
-## Live protocol (Phase 7, requires the user's two accounts, est. spend: one controlled session ≈ 3–6% of one 5h window per arm)
+```
+naive ≈ 2 × C
+```
 
-1. Setup: `lodestone profile add work && lodestone login work && lodestone init && lodestone config set realUsage on`. `lodestone doctor` green on both profiles.
-2. Build a controlled working session on `personal` in a test repo: scripted prompts that read ~6 files and make ~3 edits until context ≈ 40–60k (visible in statusline). Record session id, final context tokens, `five_hour.used_percentage`.
-3. **Handoff arm:** `/handoff` in-session (Tier 1), quit, `lodestone switch work`, ask one continuation question, then 5 scripted follow-ups. Record from work-profile JSONL: first-turn usage, per-turn usage; quality judgment.
-4. **Naive-arm measurement without burning a real replay** (default): compute from the recorded C via the formula, cross-checked against the user's HISTORICAL naive switches — `lodestone audit` heuristic detector over June–July transcripts in `~/.claude` finds real past `/login`-era boundary events with actual first-turn cache_creation numbers. (Optional strict arm, only with explicit consent: actually replay the session on B once and measure.)
-5. **Keepalive check:** `lodestone keepalive personal --for 5m` with `LODESTONE_KEEPALIVE_IMMEDIATE=1` → inspect the ping's JSONL usage per secondary metric (d).
-6. Fill Results below; screenshots of dash + statusline for the README/launch post.
+**Handoff crossing.** A fresh session on the other side pays for its own preamble plus the handoff, and nothing else:
 
-## Threats to validity
+```
+handoff ≈ 2 × (S + H)
+```
 
-- Weighted-token model approximates an unpublished accounting formula → we report raw token buckets alongside weighted figures, and real `used_percentage` deltas where available.
-- S varies by machine (CLAUDE.md/memory size); reported per-run.
-- n=1 user, 1 machine for the live run → claims phrased as "measured on real sessions", not universal constants; audit lets every user reproduce on their own history.
-- The undocumented usage endpoint may change → quota deltas are a secondary, not primary, metric.
+`C` grows all session. `S + H` does not. That gap is the entire product, and it widens the longer you work.
 
-## Addendum (2026-07-13): boundary-generalization arms
+## A worked example, from a real session
 
-Two arms added by ADR-012 features, same JSONL-based measurement:
+Measured on the session that wrote this file, read from its own transcript:
 
-- **Refresh arm (same account):** build a session to ~40k context → `/handoff` → `/clear` → continue with 5 scripted follow-ups. Measure: first post-clear turn's cache_creation+input vs the counterfactual continue-after-expiry (2×C, computed) AND vs a native `/compact` at the same point (run once for comparison; its summarization turn cost is visible in the same transcript). Report all three.
-- **Trail-mode session:** one working session with trail mode on. Measure: (a) total trail overhead = Σ output tokens of trail-update tool calls (identifiable by Write/Edit tool_use targeting trail.md) weighted, (b) trail freshness at session end (mtime vs last activity), (c) subjective continuation quality from the trail alone after a simulated wall (/clear without /handoff).
-- **Keepalive validation** unchanged (secondary metric d).
+| | Value |
+|---|---|
+| Context (`C`) | 149,884 tokens |
+| Naive crossing (`2C`) | ≈ 299,768 weighted |
+| Handoff crossing (`2(S+H)`) | ≈ 42,604 weighted |
+| Difference | ≈ 257,000 weighted, about 86% less |
 
-## Results (Phase 11 — to be filled)
+This is what `lodestone status` prints as `switch tax now`, and what the statusline shows as `switch 300k→43k`. It is computed from a measured `C` and a measured handoff size. It is not a guess at a percentage of your plan, and lodestone will refuse to print one of those: see "the 9297% rule" below.
 
-_Pending live validation._
+## Reproducing it on your own data
+
+```bash
+lodestone status          # the switch tax right now, from your live context
+lodestone audit           # every boundary you actually crossed, and what each cost
+lodestone audit --json    # the same, machine readable
+```
+
+`audit` reads your own transcripts. It reports two kinds of event:
+
+- **Explicit**, from a handoff that was written and then consumed. The record says which account wrote it, which account picked it up, and how big the context was at the time. This is evidence, not inference.
+- **Heuristic**, from session timing alone, for boundaries you crossed before you installed lodestone. Weaker, and labeled as such.
+
+Events are classified `switch` (a different account picked it up), `refresh` (same account, session deliberately shed), or `post-reset` (same account, picked up after a usage window reset), so you can see which kind of crossing is actually costing you.
+
+## The 9297% rule
+
+An early build printed a usage figure of "9297%". It got there by dividing measured tokens by a plan budget it was only guessing at. The rule that came out of that: **never print a percentage of a quantity you do not actually know.** When live quota data is unavailable, lodestone reports what it measured in weighted tokens and says the source is an estimate. It never converts that into a confident-looking percentage. Anything labeled `est` is a local model; anything labeled `live` came from Claude Code's own quota feed or, with `realUsage` on, from your own usage endpoint.
+
+## What this does not prove
+
+Being straight about the limits, because the numbers above are a model applied to real measurements, not a controlled experiment:
+
+- **No controlled A/B has been run.** Doing the naive arm honestly means deliberately burning a full context replay on a second account, which is the exact cost the tool exists to avoid. The naive figure is therefore computed from the measured `C` using the pricing weights, not observed. The handoff figure is observed.
+- **The weighting is a model.** Subscription usage accounting is not published in full. The weights come from documented API cache pricing and match observed behavior, but they approximate an accounting formula we cannot see. That is why raw token buckets are always reported alongside weighted figures, and why real `used_percentage` deltas are preferred whenever they are available.
+- **`S` varies by machine.** Your preamble depends on the size of your CLAUDE.md and your tool set. A big CLAUDE.md raises the floor for every fresh session, including the ones lodestone creates.
+- **Compounding is claimed, not yet measured.** The model says a naive crossing keeps paying, because `C` is dragged into every subsequent turn, while a handoff crossing does not. That follows from how caching works, and it is not separately validated here.
+- **One machine, one user.** These figures are from real sessions, not from a study. `audit` exists precisely so that you do not have to believe them: run it against your own history.
+
+## Threats we actively guard against
+
+- The undocumented usage endpoint could change or disappear. It is a secondary source, never the only one, and every consumer degrades to an estimate and says so.
+- Heuristic audit events can be wrong (two sessions close in time are not necessarily a handoff). They are labeled `heuristic` and are suppressed wherever an explicit record exists for the same crossing.
+- A handoff's consumption record has to survive the handoffs that come after it, or the audit trail quietly rots. It is written to the archive beside the handoff itself, and there is a test pinning that.

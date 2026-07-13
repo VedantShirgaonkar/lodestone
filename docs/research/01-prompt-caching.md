@@ -57,7 +57,7 @@ Question: can any local tool access, transfer, warm, or otherwise manipulate one
 3. Empirical: fresh sessions on this machine cache-read the shared preamble within one account (org-wide prefix reuse works), while the user's observed 40–80% window burn on `/login` switches is exactly what org isolation predicts.
 4. Even within one account the cache is narrower than assumed: the system prompt embeds machine, working directory, and a git snapshot — different directories/worktrees miss each other's cache; sequential sessions share only when the git state matches; subagents run on the 5-minute tier; resuming after a version upgrade reprocesses everything.
 
-What CAN be manipulated, officially sanctioned: the TTL clock *within* an account — "each request that hits the cache resets the timer," free. That yields the switch-back keepalive (docs/research/06 §4), and it is the entire extent of legitimate "cache manipulation."
+What CAN be manipulated, officially sanctioned: the TTL clock *within* an account — "each request that hits the cache resets the timer," free. That yields the switch-back keepalive (docs/research/04 §4), and it is the entire extent of legitimate "cache manipulation."
 
 Claude-Code-specific TTL facts (official page, supersedes community speculation about a "60→5m change"): subscription sessions request the **1-hour TTL automatically** (matches every transcript on this machine); it drops to 5m only while drawing on extra-usage credits; API-key auth defaults to 5m (`ENABLE_PROMPT_CACHING_1H=1` opts in); `FORCE_PROMPT_CACHING_5M=1` overrides; per-model `DISABLE_PROMPT_CACHING*` switches exist.
 

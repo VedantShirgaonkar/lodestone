@@ -10,21 +10,21 @@ import {
 import { homedir } from "node:os";
 
 test("paths: mungeCwd replaces slashes", () => {
-  assert.equal(mungeCwd("/Users/rahul/Desktop/mem"), "-Users-rahul-Desktop-mem");
+  assert.equal(mungeCwd("/Users/alex/code/myapp"), "-Users-alex-code-myapp");
   assert.equal(mungeCwd("/home/user/project"), "-home-user-project");
   assert.equal(mungeCwd("relative/path"), "relative-path");
 });
 
 test("paths: projectsDirFor returns correct path", () => {
-  const configDir = "/Users/rahul/.claude";
+  const configDir = "/Users/alex/.claude";
   const projectsDir = projectsDirFor(configDir);
-  assert.equal(projectsDir, "/Users/rahul/.claude/projects");
+  assert.equal(projectsDir, "/Users/alex/.claude/projects");
 });
 
 test("paths: handoffDirFor returns correct path", () => {
-  const projectRoot = "/Users/rahul/Desktop/mem";
+  const projectRoot = "/Users/alex/code/myapp";
   const handoffDir = handoffDirFor(projectRoot);
-  assert.equal(handoffDir, "/Users/rahul/Desktop/mem/.claude/handoff");
+  assert.equal(handoffDir, "/Users/alex/code/myapp/.claude/handoff");
 });
 
 test("paths: expandTilde expands home dir", () => {

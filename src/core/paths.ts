@@ -5,7 +5,7 @@ import { join, resolve, dirname } from "node:path";
 /**
  * Munge a filesystem path to Claude Code's project directory naming:
  * replace `/` with `-` to create a flat project dir name.
- * E.g. `/Users/rahul/Desktop/mem` -> `-Users-rahul-Desktop-mem`
+ * E.g. `/Users/alex/code/myapp` -> `-Users-alex-code-myapp`
  */
 export function mungeCwd(cwd: string): string {
   return cwd.split("/").join("-");

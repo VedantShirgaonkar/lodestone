@@ -13,6 +13,6 @@ Registry check (2026-07-10): `ccbaton`, `ccswitch`, `ccrelay`, `claude-baton` ta
 - Release: `npm version` tags + GitHub Actions publishing on tag (provenance enabled); CHANGELOG.md kept by hand.
 
 ## Consequences
-- Publishing requires the user's npm account + `gh repo create` — prepared by the assistant, executed by the user (outward-facing actions stay human-approved).
+- Publishing is a human-approved step: the package is prepared in the repo, and a maintainer runs the publish.
 
-**2026-07-12:** renamed to `lodestone` at the user's direction (npm and VS Code marketplace names verified free); mechanics unchanged.
+**2026-07-12:** renamed to `lodestone` (npm and registry names verified free); mechanics unchanged.

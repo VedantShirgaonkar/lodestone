@@ -3,7 +3,7 @@
 **Status:** accepted · 2026-07-12
 
 ## Context
-The official Claude Code VS Code extension runs the same engine (hooks, skills, advisor all work there) but **does not execute custom statuslines** (anthropics/claude-code #55643, #20207, #11165, #21265) — so inside VS Code, users get no live quota/cache visibility from us. Community tools bridge this via a cache file written by the CLI statusline and read by a VS Code extension — the exact file bridge lodestone already has (`usage-cache.json`). The user requires the monitoring features (handoff intimation, cache-TTL countdown, savings) to be present in the VS Code UX, one-click usable, and shippable to other users.
+The official Claude Code VS Code extension runs the same engine (hooks, skills, advisor all work there) but **does not execute custom statuslines** (anthropics/claude-code #55643, #20207, #11165, #21265) — so inside VS Code, users get no live quota/cache visibility from us. Community tools bridge this via a cache file written by the CLI statusline and read by a VS Code extension — the exact file bridge lodestone already has (`usage-cache.json`). Requirement: the monitoring features (handoff prompts, cache-TTL countdown, savings) must be present in the editor, one click away, and shippable to other people.
 
 ## Decision
 A companion extension living in `vscode/` in the same repo, deliberately thin (one brain — the CLI; several faces):

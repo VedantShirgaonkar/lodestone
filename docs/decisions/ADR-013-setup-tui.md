@@ -8,7 +8,7 @@ A skilled developer tried lodestone cold and reported the setup as messy. Auditi
 1. **Eight steps, none discoverable.** `npm install -g`, `init`, `init --statusline` (a second, separate invocation), `config set realUsage on`, `doctor`, `profile add`, `login`, and an undocumented "restart your session".
 2. **Nothing guides the user.** Bare `lodestone` prints a 17-command list under a stale tagline that still describes the pre-generalization product.
 3. **The failures are silent.** We hit `EACCES` on the global install ourselves, and `realUsage` was accepting `on` as `false` for days without anyone noticing, because nothing verified it end to end.
-4. **No feedback loop.** `doctor` existed but nobody knew to run it, and until today it reported hooks as "Phase 3 feature".
+4. **No feedback loop.** `doctor` existed but nobody knew to run it, and it reported hooks as unimplemented even once they were installed.
 
 Research (awesome-tuis survey, CLI onboarding practice): almost no CLI ships a formal wizard, and the ones that do (OpenClaw, dbt) are cited as their smoothest first-run experience. The consistent guidance: offer a quick path with sane defaults, disclose complexity progressively, validate each step live rather than at the end, and use color sparingly and semantically. "If everything is a highlight, nothing is a highlight."
 

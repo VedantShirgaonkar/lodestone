@@ -4,8 +4,18 @@
 
 <p align="center"><b>Stop paying Claude Code's cache tax.</b><br>Live usage and cache monitoring, context handoffs, and account switching, in one command.</p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/v/lodestone-cli?color=7c6cba&label=npm" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/dm/lodestone-cli?color=7c6cba&label=downloads" alt="npm downloads"></a>
+  <a href="https://open-vsx.org/extension/VedantShirgaonkar/lodestone"><img src="https://img.shields.io/open-vsx/v/VedantShirgaonkar/lodestone?color=4ad6f0&label=open%20vsx" alt="Open VSX version"></a>
+  <a href="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml"><img src="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero runtime dependencies">
+</p>
+
 ```bash
 npm install -g lodestone-cli
+lodestone setup
 ```
 
 ---
@@ -144,6 +154,31 @@ Once `lodestone init` has run, four things work on their own:
 ## It works with one account too
 
 Most of this has nothing to do with switching. Cache expiry, limit resets and bloated sessions are the same problem, and `lodestone refresh` solves them the same way: write a handoff, clear the session, and keep working for a fraction of the price.
+
+---
+
+## Install
+
+| | |
+|---|---|
+| **CLI** | `npm install -g lodestone-cli` ([npm](https://www.npmjs.com/package/lodestone-cli)) |
+| **Editor extension** | Search **Lodestone** in your Extensions panel ([Open VSX](https://open-vsx.org/extension/VedantShirgaonkar/lodestone)) |
+
+The extension works in any editor that reads the Open VSX Registry: Cursor, Windsurf, Devin Desktop, VSCodium, Google Antigravity, AWS Kiro, Gitpod, Eclipse Theia, and others built on the VS Code extension model. It is a thin client. The CLI is the engine, so install that first.
+
+## Documentation
+
+[docs/](docs/) has the full set, in reading order. The three worth knowing about:
+
+- [How Claude Code memory works](docs/explainer/how-claude-code-memory-works.md). The cache physics this is all built on. Worth reading even if you never install anything.
+- [The user guide](docs/GUIDE.md). Every feature, when to use it, and how to read the numbers.
+- [Evaluation](docs/EVALUATION.md). How the savings are measured, and what the measurement does not prove.
+
+## Contributing
+
+Issues and pull requests are welcome. [CONTRIBUTING.md](CONTRIBUTING.md) covers the setup and the handful of rules that are not negotiable (zero runtime dependencies, synthetic test fixtures, hooks that cannot break your session). Design decisions live in [docs/decisions/](docs/decisions/) as ADRs; if a change would overturn one, open an issue first.
+
+Found a security issue? [SECURITY.md](SECURITY.md).
 
 ---
 

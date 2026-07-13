@@ -41,7 +41,9 @@ For a session with context size C (tokens) on the account you're leaving:
 
 ## Team plan notes
 
-Team (premium seat) users get Claude Code with per-seat limits on the same 5h + weekly structure; admins can buy extra usage. Seat usage is individual — the intern's Team seat and personal Pro account are two orgs with two separate limit pools *and two separate caches* (see 01-prompt-caching.md). Using both accounts deliberately to double available capacity is exactly the workflow lodestone supports — the handoff makes the boundary cheap to cross. (Whether juggling two subscriptions is desirable is a user/org policy question, not a technical one; both subscriptions are paid for.)
+Team (premium seat) users get Claude Code with per-seat limits on the same 5h + weekly structure; admins can buy extra usage. Seat usage is individual.
+
+The consequence that matters here: a Team seat and a personal subscription are two different organizations, so they have two separate limit pools *and two separate caches* (see 01-prompt-caching.md). People who legitimately hold both (a work seat and a personal plan, each paid for) already move between them, and the crossing is where the cost lands. Lodestone does not create that situation or encourage it; it makes an unavoidable boundary cheap to cross. Whether to hold two subscriptions is a policy question for you and your organization, not a technical one, and nothing here is a way around a single plan's limits: the same machinery is what makes cache expiry, limit resets and session bloat cheap on one account.
 
 ## Sources
 
