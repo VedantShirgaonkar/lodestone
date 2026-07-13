@@ -1,4 +1,4 @@
-# Research: Claude Code Internals That warmswap Builds On
+# Research: Claude Code Internals That lodestone Builds On
 
 > Verified 2026-07-10 on Claude Code v2.1.206 (macOS) + official docs (code.claude.com/docs). Every mechanism below was either observed directly on this machine or quoted from current docs.
 
@@ -9,7 +9,7 @@
 - **Credentials:**
   - macOS: Keychain generic password, service `"Claude Code-credentials"`. **The entry is keyed by a SHA-256 hash of the active `CLAUDE_CONFIG_DIR`** — different config dir → different Keychain entry → fully isolated login. (Community-verified: fortunto2 gist "Claude Code multi-account auth switcher", melkon.tech, daring-designs; consistent with the item observed on this machine.)
   - Linux/Windows: `<config-dir>/.credentials.json`, mode 0600.
-  - warmswap must **never read or copy credentials** — it only points `CLAUDE_CONFIG_DIR` at a profile dir and lets `claude /login` own auth.
+  - lodestone must **never read or copy credentials** — it only points `CLAUDE_CONFIG_DIR` at a profile dir and lets `claude /login` own auth.
 - Caveat (Windows-reported): some global state may still touch `~/.claude.json`; per-profile config dirs each maintain their own `.claude.json` inside the dir. Verify per-platform during testing.
 
 ## 2. Session transcripts (the raw material for snapshots)
@@ -37,13 +37,13 @@ Key fields (observed v2.1.170–2.1.206):
 
 Configured in `settings.json` (user `~/.claude/settings.json` — i.e. **per config dir**, so per profile), project `.claude/settings.json`, or `.claude/settings.local.json`. JSON output on exit 0; `hookSpecificOutput.additionalContext` injects context.
 
-- **SessionStart** — fires on `startup` / `resume` / `clear` / `compact` (matcher = source). Input: `session_id`, `transcript_path`, `cwd`, `model`, `source`. Output can inject `additionalContext` (string) → **this is warmswap's rehydration channel**: a hook that, when a fresh handoff exists for this project, prints it into the new session's context automatically.
-- **SessionEnd** — fires on session termination with `transcript_path`, `cwd`, reason (`clear`, `resume`, `logout`, `prompt_input_exit`, `other`). Side-effects only → **warmswap's free auto-snapshot trigger** (extract state from the transcript; no tokens spent).
+- **SessionStart** — fires on `startup` / `resume` / `clear` / `compact` (matcher = source). Input: `session_id`, `transcript_path`, `cwd`, `model`, `source`. Output can inject `additionalContext` (string) → **this is lodestone's rehydration channel**: a hook that, when a fresh handoff exists for this project, prints it into the new session's context automatically.
+- **SessionEnd** — fires on session termination with `transcript_path`, `cwd`, reason (`clear`, `resume`, `logout`, `prompt_input_exit`, `other`). Side-effects only → **lodestone's free auto-snapshot trigger** (extract state from the transcript; no tokens spent).
 - **PreCompact** — before manual/auto compaction; can block; gets `transcript_path` → snapshot-before-compaction insurance.
 - **UserPromptSubmit** — can inject `additionalContext` per prompt; 30s default timeout. (Not used in v1; candidate for "switch advisor" nudges.)
 - Hook config shape: `{"hooks": {"SessionEnd": [{"hooks": [{"type":"command","command":"...","timeout":10}]}]}}`.
 
-## 4. CLI surface used by warmswap
+## 4. CLI surface used by lodestone
 
 - `claude` respects `CLAUDE_CONFIG_DIR` (env). Launcher = `exec` with env set; all extra args pass through.
 - Headless: `claude -p "prompt"` (print mode), `--output-format json` (result incl. usage/session id) / `stream-json`.
@@ -53,19 +53,19 @@ Configured in `settings.json` (user `~/.claude/settings.json` — i.e. **per con
 
 ## 5. Statusline (the live meter surface)
 
-`settings.json`: `{"statusLine": {"type": "command", "command": "<script>", "padding": 0}}`. Script gets JSON on stdin per render, including: `session_id`, `transcript_path`, `model`, `workspace`, `version`, `cost` (`total_cost_usd`, `total_input_tokens`, `total_output_tokens`, duration), and **`context_window` (`used_percentage`, token counts, `exceeds_200k_tokens`, `current_usage`)**. First line of stdout is displayed (ANSI colors supported; multi-line supported). → warmswap ships an optional statusline segment: active profile + est. switch tax + window burn.
+`settings.json`: `{"statusLine": {"type": "command", "command": "<script>", "padding": 0}}`. Script gets JSON on stdin per render, including: `session_id`, `transcript_path`, `model`, `workspace`, `version`, `cost` (`total_cost_usd`, `total_input_tokens`, `total_output_tokens`, duration), and **`context_window` (`used_percentage`, token counts, `exceeds_200k_tokens`, `current_usage`)**. First line of stdout is displayed (ANSI colors supported; multi-line supported). → lodestone ships an optional statusline segment: active profile + est. switch tax + window burn.
 
 ## 6. Memory & context persistence surfaces
 
 - **CLAUDE.md hierarchy** (load order): managed policy (`/Library/Application Support/ClaudeCode/CLAUDE.md` on macOS) → user `~/.claude/CLAUDE.md` (per config dir!) → project `./CLAUDE.md` or `./.claude/CLAUDE.md` → `./CLAUDE.local.md` (gitignored personal). Parent-dir files load at launch; subdirectory files load on demand. `@path` imports (4-hop max, skipped inside backticks/code fences). HTML comments stripped before injection. Guidance: keep <200 lines.
 - **`.claude/rules/*.md`** — modular rules, optional `paths:` frontmatter scoping (load when matching files are touched).
-- **Auto memory** (v2.1.59+, on by default): per-project dir `~/.claude/projects/<project>/memory/` — `MEMORY.md` index (first 200 lines / 25KB loaded every session) + topic files read on demand. Setting: `autoMemoryEnabled`, `autoMemoryDirectory`, env `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. **Per config dir → NOT shared across profiles by default.** warmswap option: set `autoMemoryDirectory` to a shared path in both profiles so learned knowledge crosses accounts (it's local markdown, no billing implication).
+- **Auto memory** (v2.1.59+, on by default): per-project dir `~/.claude/projects/<project>/memory/` — `MEMORY.md` index (first 200 lines / 25KB loaded every session) + topic files read on demand. Setting: `autoMemoryEnabled`, `autoMemoryDirectory`, env `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`. **Per config dir → NOT shared across profiles by default.** lodestone option: set `autoMemoryDirectory` to a shared path in both profiles so learned knowledge crosses accounts (it's local markdown, no billing implication).
 - **Compaction:** `/compact [instructions]`; auto-compact near context limit; project-root CLAUDE.md is re-read and re-injected after compaction, nested ones aren't. Compaction itself is an LLM call on the *current* account (cheap there: mostly cache reads).
 - What a session sends every turn: "The conversation so far… Project context — your CLAUDE.md and any files Claude has read. Your new prompt." (support docs) — i.e. context size is the tax base.
 
 ## 7. Skills
 
-`SKILL.md` files under `~/.claude/skills/<name>/` (per config dir) or `.claude/skills/` (project). Frontmatter (`name`, `description`) + body instructions; invoked as `/name` or auto-triggered. warmswap ships a project-installable `/handoff` skill so users can trigger a distilled handoff *from inside* an interactive session (the skill instructs Claude to write the handoff file itself using conversation knowledge — zero extra API calls beyond the turn).
+`SKILL.md` files under `~/.claude/skills/<name>/` (per config dir) or `.claude/skills/` (project). Frontmatter (`name`, `description`) + body instructions; invoked as `/name` or auto-triggered. lodestone ships a project-installable `/handoff` skill so users can trigger a distilled handoff *from inside* an interactive session (the skill instructs Claude to write the handoff file itself using conversation knowledge — zero extra API calls beyond the turn).
 
 ## Sources
 

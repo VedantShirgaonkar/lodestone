@@ -1,6 +1,6 @@
-# warmswap
+# lodestone
 
-Open-source CLI (npm: `warmswap`) solving the Claude Code cross-account "cache tax": per-account profiles via `CLAUDE_CONFIG_DIR` + automated context handoffs + switch-cost measurement. TypeScript, ESM, Node ≥20, **zero runtime dependencies** (dev-only: typescript, @types/node). Tests: `node --test` (no vitest/jest).
+Open-source CLI (npm: `lodestone-cli` → binary: `lodestone`) solving the Claude Code cross-account "cache tax": per-account profiles via `CLAUDE_CONFIG_DIR` + automated context handoffs + switch-cost measurement. TypeScript, ESM, Node ≥20, **zero runtime dependencies** (dev-only: typescript, @types/node). Tests: `node --test` (no vitest/jest).
 
 ## Commands
 - `npm run build` — tsc to `dist/`

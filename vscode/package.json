@@ -1,13 +1,13 @@
 {
-  "name": "warmswap-vscode",
-  "displayName": "warmswap",
-  "description": "Claude Code account switching without the usage-limit tax — quota, cache countdowns, and one-click handoff.",
+  "name": "lodestone",
+  "displayName": "Lodestone",
+  "description": "Lodestone — live Claude Code usage & cache monitoring with one-click handoffs and account switching. Companion to the lodestone CLI.",
   "version": "0.1.0",
   "publisher": "OWNER-TODO",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/your-org/warmswap"
+    "url": "https://github.com/VedantShirgaonkar/lodestone"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -22,30 +22,30 @@
   "contributes": {
     "commands": [
       {
-        "command": "warmswap.menu",
-        "title": "warmswap: Menu"
+        "command": "lodestone.menu",
+        "title": "Lodestone: Menu"
       },
       {
-        "command": "warmswap.handoffSwitch",
-        "title": "warmswap: Handoff & Switch Account…"
+        "command": "lodestone.handoffSwitch",
+        "title": "Lodestone: Handoff & Switch Account…"
       },
       {
-        "command": "warmswap.keepWarm",
-        "title": "warmswap: Keep Current Account Warm…"
+        "command": "lodestone.keepWarm",
+        "title": "Lodestone: Keep Current Account Warm…"
       },
       {
-        "command": "warmswap.openDash",
-        "title": "warmswap: Open Dashboard (terminal)"
+        "command": "lodestone.openDash",
+        "title": "Lodestone: Open Dashboard (terminal)"
       },
       {
-        "command": "warmswap.refresh",
-        "title": "warmswap: Refresh Status"
+        "command": "lodestone.refresh",
+        "title": "Lodestone: Refresh Status"
       }
     ],
     "configuration": {
-      "title": "warmswap",
+      "title": "Lodestone",
       "properties": {
-        "warmswap.expiryToastMinutes": {
+        "lodestone.expiryToastMinutes": {
           "type": "number",
           "default": 0,
           "description": "Show a toast notification when a project's cache is about to expire (within N minutes). 0 = disabled."

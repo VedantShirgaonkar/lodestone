@@ -11,7 +11,7 @@ import { mkdirSync, rmSync, existsSync, readFileSync, readdirSync } from "node:f
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const testDir = join(tmpdir(), "warmswap-test-handoff");
+const testDir = join(tmpdir(), "lodestone-test-handoff");
 
 test.before(() => {
   if (existsSync(testDir)) {

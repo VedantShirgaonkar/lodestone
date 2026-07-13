@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "..", "..", "bin/warmswap.js");
-const testDir = resolve(tmpdir(), `warmswap-test-audit-${Date.now()}`);
+const CLI = resolve(__testDir, "..", "..", "bin/lodestone.js");
+const testDir = resolve(tmpdir(), `lodestone-test-audit-${Date.now()}`);
 const FIXTURE_SESSION = resolve(__testDir, "fixtures", "session-small.jsonl");
 
 function runAudit(
@@ -36,10 +36,10 @@ function runAudit(
 test("audit: shows no events when no sessions exist", async () => {
   const testHome = resolve(testDir, "home1");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -60,10 +60,10 @@ test("audit: shows no events when no sessions exist", async () => {
 test("audit: accepts --since flag", async () => {
   const testHome = resolve(testDir, "home2");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -87,10 +87,10 @@ test("audit: accepts --since flag", async () => {
 test("audit: accepts --json flag", async () => {
   const testHome = resolve(testDir, "home3");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -118,10 +118,10 @@ test("audit: accepts --json flag", async () => {
 test("audit: handles invalid --since", async () => {
   const testHome = resolve(testDir, "home4");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -147,10 +147,10 @@ test("audit: parseDuration rejects invalid formats", async () => {
   // The audit command will error on invalid --since values
   const testHome = resolve(testDir, "home5");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -178,10 +178,10 @@ test("audit: parseDuration rejects invalid formats", async () => {
 test("audit: --json includes class field and byClass summary", async () => {
   const testHome = resolve(testDir, "home6");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -213,7 +213,7 @@ test("audit: classifies refresh when same profile with <5h gap", async () => {
   const sourceSessionMtimeMs = now - 3 * 60 * 60 * 1000; // 3 hours ago
   const consumedAtMs = sourceSessionMtimeMs + 2 * 60 * 60 * 1000; // 2 hours later
 
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await mkdir(handoffDir, { recursive: true });
 
@@ -246,7 +246,7 @@ test("audit: classifies refresh when same profile with <5h gap", async () => {
   );
 
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -277,7 +277,7 @@ test("audit: classifies post-reset when same profile with ≥5h gap", async () =
   const sourceSessionMtimeMs = now - 7 * 60 * 60 * 1000; // 7 hours ago
   const consumedAtMs = sourceSessionMtimeMs + 6 * 60 * 60 * 1000; // 6 hours later
 
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await mkdir(handoffDir, { recursive: true });
 
@@ -310,7 +310,7 @@ test("audit: classifies post-reset when same profile with ≥5h gap", async () =
   );
 
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },

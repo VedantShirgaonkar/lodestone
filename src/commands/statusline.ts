@@ -70,7 +70,7 @@ export async function statusline(): Promise<number> {
     // Read stdin with timeout
     const input = await readStdinWithTimeout(150);
     if (!input) {
-      console.log("⇄ warmswap");
+      console.log("⇄ lodestone");
       return 0;
     }
 
@@ -213,7 +213,7 @@ export async function statusline(): Promise<number> {
     console.log(line);
     return 0;
   } catch {
-    console.log("⇄ warmswap");
+    console.log("⇄ lodestone");
     return 0;
   }
 }

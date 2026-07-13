@@ -74,7 +74,7 @@ interface SwitchTaxPanel {
 }
 
 /**
- * warmswap dash — live full-screen TUI (ANSI, zero deps, 2s refresh)
+ * lodestone dash — live full-screen TUI (ANSI, zero deps, 2s refresh)
  * --once flag: render single frame and exit (for tests)
  */
 export async function dash(
@@ -118,7 +118,7 @@ export async function dash(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap dash: ${message}\n`);
+    stderr.write(`lodestone dash: ${message}\n`);
     return 1;
   }
 }
@@ -355,11 +355,11 @@ async function getRecentSessions(
 
 function getKeepaliveStatus(): string | null {
   try {
-    // Check for keepalive pidfile in ~/.config/warmswap/keepalive-*.json
+    // Check for keepalive pidfile in ~/.config/lodestone/keepalive-*.json
     const homeDir = process.env.HOME;
     if (!homeDir) return null;
 
-    const keepaliveDir = join(homeDir, ".config", "warmswap");
+    const keepaliveDir = join(homeDir, ".config", "lodestone");
     if (!existsSync(keepaliveDir)) return null;
 
     const files = readdirSync(keepaliveDir);
@@ -409,7 +409,7 @@ function renderFrame(frame: DashFrame): void {
 
   // Header
   lines.push(
-    `warmswap dash · ${frame.timestamp} · q quit · r refresh`
+    `lodestone dash · ${frame.timestamp} · q quit · r refresh`
   );
   lines.push("");
 

@@ -39,7 +39,7 @@ interface AuditOutput {
 }
 
 /**
- * warmswap audit — analyze handoff and switch events
+ * lodestone audit — analyze handoff and switch events
  *
  * audit [--since <days>d] [--json]
  */
@@ -97,7 +97,7 @@ export async function audit(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap audit: ${message}\n`);
+    stderr.write(`lodestone audit: ${message}\n`);
     return 1;
   }
 }

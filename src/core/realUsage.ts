@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { execSync } from "node:child_process";
-import { warmswapConfigPath } from "./paths.js";
+import { lodestoneConfigPath } from "./paths.js";
 
 export interface UsageBudgetSegment {
   utilization?: number | undefined;
@@ -38,14 +38,14 @@ export interface QuotaResult {
  * Cache bridge path for statusline-driven real data
  */
 export function usageCachePath(configDir: string): string {
-  return join(configDir, "warmswap", "usage-cache.json");
+  return join(configDir, "lodestone", "usage-cache.json");
 }
 
 /**
  * Advisor state path for debounce tracking
  */
 export function advisorStatePath(configDir: string): string {
-  return join(configDir, "warmswap", "advisor-state.json");
+  return join(configDir, "lodestone", "advisor-state.json");
 }
 
 /**

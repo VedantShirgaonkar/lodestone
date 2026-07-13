@@ -5,7 +5,7 @@ import { mkdirSync, rmSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-const testDir = join(tmpdir(), "warmswap-test-config");
+const testDir = join(tmpdir(), "lodestone-test-config");
 const origXdgConfigHome = process.env.XDG_CONFIG_HOME;
 
 test.before(() => {

@@ -10,7 +10,7 @@ assignees: ""
 Brief description of the issue.
 
 ## Steps to reproduce
-1. Run `warmswap [command]`
+1. Run `lodestone [command]`
 2. ...
 3. See error
 
@@ -21,7 +21,7 @@ What should have happened.
 What actually happened (output, error message, etc.).
 
 ## Environment
-- Output of `warmswap doctor`:
+- Output of `lodestone doctor`:
 ```
 [paste doctor output here]
 ```
@@ -31,7 +31,7 @@ What actually happened (output, error message, etc.).
 - Claude Code version: (run `claude --version`)
 
 ## Logs
-Relevant content from `~/.config/warmswap/warmswap.log` (if available).
+Relevant content from `~/.config/lodestone/lodestone.log` (if available).
 
 ## Additional context
-Any other context (e.g., does `warmswap doctor` pass? which profile? any custom config?)
+Any other context (e.g., does `lodestone doctor` pass? which profile? any custom config?)

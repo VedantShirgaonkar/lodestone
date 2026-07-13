@@ -49,7 +49,7 @@ git_branch: <current branch or "unknown">
 5. Tell the user exactly this, filling in the token estimate (chars/3.6):
 
 > Handoff written to `.claude/handoff/latest.md` (~N tokens).
-> To continue on another account: quit this session, then run `warmswap switch <profile>` — the new session picks the handoff up automatically (or paste the file if hooks aren't installed).
+> To continue on another account: quit this session, then run `lodestone switch <profile>` — the new session picks the handoff up automatically (or paste the file if hooks aren't installed).
 
 ## Rules
 

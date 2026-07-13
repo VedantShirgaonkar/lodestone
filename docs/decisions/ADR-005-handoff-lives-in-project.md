@@ -3,10 +3,10 @@
 **Status:** accepted · 2026-07-10
 
 ## Context
-The handoff must be found by a SessionStart hook running under *either* profile, for the right project. Candidate homes: inside a config dir (wrong — profile-scoped), a global warmswap dir keyed by project path (works, but invisible to users and to git), or in the project itself.
+The handoff must be found by a SessionStart hook running under *either* profile, for the right project. Candidate homes: inside a config dir (wrong — profile-scoped), a global lodestone dir keyed by project path (works, but invisible to users and to git), or in the project itself.
 
 ## Decision
-`<project>/.claude/handoff/` — `latest.md` + `latest.meta.json` + `archive/` + `auto/`. Profile-agnostic by construction (both profiles see the same cwd), transparent (it's markdown next to your code), and optionally committable: teams/cross-device users can commit the directory and get antonwing77-style git relay for free. `warmswap init` adds `.claude/handoff/` to `.gitignore` by default (handoffs can contain conversation fragments — private by default; opting into committing is one deleted gitignore line, documented).
+`<project>/.claude/handoff/` — `latest.md` + `latest.meta.json` + `archive/` + `auto/`. Profile-agnostic by construction (both profiles see the same cwd), transparent (it's markdown next to your code), and optionally committable: teams/cross-device users can commit the directory and get antonwing77-style git relay for free. `lodestone init` adds `.claude/handoff/` to `.gitignore` by default (handoffs can contain conversation fragments — private by default; opting into committing is one deleted gitignore line, documented).
 
 ## Consequences
 - Non-project sessions (cwd without write access / throwaway dirs) can't persist handoffs → v1 documents this; global-fallback dir is a possible v1.1.

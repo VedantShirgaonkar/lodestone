@@ -20,7 +20,7 @@ CUT: nothing. (Reviewed each for redundancy against the generalized frame — ev
 
 ## Publishability & usability posture
 
-- **Naming:** publish-blocking user gate (their explicit directive, twice). Nothing ships to npm/marketplace/GitHub until the user confirms the final name in writing. Current `warmswap` is provisional.
+- **Naming:** publish-blocking user gate (their explicit directive, twice). Nothing ships to npm/marketplace/GitHub until the user confirms the final name in writing. Current `lodestone` is provisional.
 - **Marketplace footfall:** treated as a real workstream (Phase 10): SEO research → listing engineering (name/description keyword placement, category, icon, README-top-as-search-snippet, badges, qna, verified links). Same care for npm keywords.
 - **Repo flow:** user creates the GitHub repo post-naming, provides URL; we add remote and push every commit thereafter.
 - **Usability:** every feature reachable three ways — CLI command, in-session (skill/advisor/statusline), and extension click — enforced by extending docs/FEATURES.md as the acceptance matrix for Phase 9.

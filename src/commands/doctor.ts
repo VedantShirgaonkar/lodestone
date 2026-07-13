@@ -78,14 +78,14 @@ export async function doctor(
 
       if (Object.keys(config.profiles).length === 0) {
         checks.push({
-          name: "warmswap config",
+          name: "lodestone config",
           status: "FAIL",
           message: "no profiles registered",
         });
         hasFailure = true;
       } else {
         checks.push({
-          name: "warmswap config",
+          name: "lodestone config",
           status: "ok",
           message: `${Object.keys(config.profiles).length} profile(s)`,
         });
@@ -121,7 +121,7 @@ export async function doctor(
               checks.push({
                 name: `login (${name})`,
                 status: "FAIL",
-                message: `run: warmswap login ${name}`,
+                message: `run: lodestone login ${name}`,
               });
               hasFailure = true;
             } else {
@@ -137,7 +137,7 @@ export async function doctor(
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       checks.push({
-        name: "warmswap config",
+        name: "lodestone config",
         status: "FAIL",
         message: `parse error: ${msg}`,
       });
@@ -148,7 +148,7 @@ export async function doctor(
     try {
       const projectRoot = findProjectRoot(process.cwd());
       const handoffDir = handoffDirFor(projectRoot);
-      const testFile = join(handoffDir, ".warmswap-test");
+      const testFile = join(handoffDir, ".lodestone-test");
 
       try {
         // Create directory if needed
@@ -247,7 +247,7 @@ export async function doctor(
     return hasFailure ? 1 : 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap doctor: ${msg}`);
+    console.error(`lodestone doctor: ${msg}`);
     return 1;
   }
 }

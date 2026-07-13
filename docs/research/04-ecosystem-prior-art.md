@@ -4,7 +4,7 @@
 
 ## Handoff-shaped tools (context preservation between sessions)
 
-| Project | What it does | Gap vs warmswap |
+| Project | What it does | Gap vs lodestone |
 |---|---|---|
 | Sonovore/claude-code-handoff | Claude continuously maintains `.claude/session-state.md` during work | No account/profile layer, no measurement, relies on Claude remembering to update |
 | antonwing77/session-handoff | Skill: commit+push code, write handoff doc to `.claude/handoffs/` + `LATEST.md`, "pickup" on the other side. Explicitly aimed at multiple accounts relaying via git | Manual; explicitly does NOT handle auth/profiles/usage/automation; 0 stars single-commit PoC |
@@ -26,7 +26,7 @@ Pattern: everyone converged on "write a structured markdown state file, read it 
 
 ## Usage-measurement tools
 
-- **ccusage** (npm, very popular): parses the same `projects/**/*.jsonl` files, daily/weekly/session/blocks reports, cost estimates from token buckets. Reads `~/.claude` and `~/.config/claude`; env var accepts comma-separated dirs. Complementary — warmswap links to it for deep reporting rather than reimplementing analytics; warmswap's own math is narrowly scoped to window-burn + switch-tax estimates.
+- **ccusage** (npm, very popular): parses the same `projects/**/*.jsonl` files, daily/weekly/session/blocks reports, cost estimates from token buckets. Reads `~/.claude` and `~/.config/claude`; env var accepts comma-separated dirs. Complementary — lodestone links to it for deep reporting rather than reimplementing analytics; lodestone's own math is narrowly scoped to window-burn + switch-tax estimates.
 - Claude-Code-Usage-Monitor, ccstatusline: real-time meters; same JSONL substrate.
 
 ## Upstream signals
@@ -36,4 +36,4 @@ Pattern: everyone converged on "write a structured markdown state file, read it 
 
 ## Positioning statement
 
-warmswap = the **workflow tool**: profiles (isolated `CLAUDE_CONFIG_DIR` accounts) + deterministic transcript snapshots + hook-automated capture/rehydration + switch-tax measurement + an honest explainer of the cache physics. It deliberately does not compete with ccusage (analytics), cc-switch (provider configs), or in-repo handoff skills (it can coexist; its own skill covers that niche). Nothing in the ecosystem combines these layers today.
+lodestone = the **workflow tool**: profiles (isolated `CLAUDE_CONFIG_DIR` accounts) + deterministic transcript snapshots + hook-automated capture/rehydration + switch-tax measurement + an honest explainer of the cache physics. It deliberately does not compete with ccusage (analytics), cc-switch (provider configs), or in-repo handoff skills (it can coexist; its own skill covers that niche). Nothing in the ecosystem combines these layers today.

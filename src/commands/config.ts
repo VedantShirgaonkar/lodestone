@@ -1,6 +1,6 @@
 import { parseArgs } from "node:util";
 import { loadConfig, saveConfig } from "../core/config.js";
-import { warmswapConfigPath } from "../core/paths.js";
+import { lodestoneConfigPath } from "../core/paths.js";
 
 interface CommandOptions {
   json: boolean;
@@ -24,7 +24,7 @@ export async function config(args: string[], opts: CommandOptions): Promise<numb
     } else if (subcommand === "set") {
       return configSet(key, value, opts);
     } else {
-      console.error("warmswap config: usage: config get|set <key> [value]");
+      console.error("lodestone config: usage: config get|set <key> [value]");
       console.error(
         "  keys: realUsage, advisor.fiveHourPct, advisor.weeklyPct, plan"
       );
@@ -32,14 +32,14 @@ export async function config(args: string[], opts: CommandOptions): Promise<numb
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap config: ${msg}`);
+    console.error(`lodestone config: ${msg}`);
     return 1;
   }
 }
 
 function configGet(key: string | undefined, opts: CommandOptions): number {
   if (!key) {
-    console.error("warmswap config get: missing key");
+    console.error("lodestone config get: missing key");
     return 2;
   }
 
@@ -61,7 +61,7 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
   } else if (key === "plan") {
     value = config.settings.plan ?? "pro";
   } else {
-    console.error(`warmswap config: unknown key: ${key}`);
+    console.error(`lodestone config: unknown key: ${key}`);
     return 1;
   }
 
@@ -76,7 +76,7 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
 
 function configSet(key: string | undefined, value: string | undefined, opts: CommandOptions): number {
   if (!key || !value) {
-    console.error("warmswap config set: missing key or value");
+    console.error("lodestone config set: missing key or value");
     return 2;
   }
 
@@ -89,7 +89,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.fiveHourPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {
-        console.error("warmswap config: fiveHourPct must be 0-100");
+        console.error("lodestone config: fiveHourPct must be 0-100");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -99,7 +99,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.weeklyPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {
-        console.error("warmswap config: weeklyPct must be 0-100");
+        console.error("lodestone config: weeklyPct must be 0-100");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -109,7 +109,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.criticalPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 1 || numValue > 100) {
-        console.error("warmswap config: criticalPct must be 1-100");
+        console.error("lodestone config: criticalPct must be 1-100");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -119,7 +119,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "advisor.trailStaleMinutes") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 1) {
-        console.error("warmswap config: trailStaleMinutes must be ≥1");
+        console.error("lodestone config: trailStaleMinutes must be ≥1");
         return 1;
       }
       if (!config.settings.advisor) {
@@ -129,7 +129,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     } else if (key === "keepalive.maxWindowPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 1 || numValue > 99) {
-        console.error("warmswap config: maxWindowPct must be 1-99");
+        console.error("lodestone config: maxWindowPct must be 1-99");
         return 1;
       }
       if (!config.settings.keepalive) {
@@ -140,19 +140,19 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
       const validPlans = ["pro", "max5", "max20", "team"];
       if (!validPlans.includes(value)) {
         console.error(
-          `warmswap config: plan must be one of: ${validPlans.join(", ")}`
+          `lodestone config: plan must be one of: ${validPlans.join(", ")}`
         );
         return 1;
       }
       config.settings.plan = value;
     } else {
-      console.error(`warmswap config: unknown key: ${key}`);
+      console.error(`lodestone config: unknown key: ${key}`);
       return 1;
     }
 
     saveConfig(config);
 
-    const configPath = warmswapConfigPath();
+    const configPath = lodestoneConfigPath();
     if (opts.json) {
       console.log(JSON.stringify({ key, value, configPath }));
     } else {
@@ -163,7 +163,7 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap config: ${msg}`);
+    console.error(`lodestone config: ${msg}`);
     return 1;
   }
 }

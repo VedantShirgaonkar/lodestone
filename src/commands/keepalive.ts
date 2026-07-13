@@ -27,7 +27,7 @@ interface CommandOptions {
 }
 
 /**
- * warmswap keepalive — manage session TTL refresh pings
+ * lodestone keepalive — manage session TTL refresh pings
  *
  * keepalive <profile> [--for 90m] [--max-pings 3]
  * keepalive --stop [<profile>]
@@ -99,7 +99,7 @@ export async function keepalive(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap keepalive: ${message}\n`);
+    stderr.write(`lodestone keepalive: ${message}\n`);
     return 1;
   }
 }
@@ -248,7 +248,7 @@ function handleStop(
 }
 
 function handleStatus(homeDir: string, _config: any): number {
-  const keepaliveDir = join(homeDir, ".config", "warmswap");
+  const keepaliveDir = join(homeDir, ".config", "lodestone");
   if (!existsSync(keepaliveDir)) {
     console.log("No active keepalive schedulers");
     return 0;

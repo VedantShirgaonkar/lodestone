@@ -1,6 +1,6 @@
 # Security & Privacy Model
 
-## What warmswap reads
+## What lodestone reads
 
 ### By default (no configuration required)
 - **Transcripts**: Session JSONL files from your Claude Code directories (read-only, parsed for usage/context metrics)
@@ -11,16 +11,16 @@
 ### With `config set realUsage on` (opt-in)
 - **OAuth access token**: Read from OS Keychain (macOS `security find-generic-password`) or `~/.claude-profiles/<profile>/.credentials.json` (Linux). **Read-only, local access only; never stored elsewhere.**
 
-## What warmswap writes
+## What lodestone writes
 
 - **Handoff files**: `.claude/handoff/latest.md` and archived versions (your project directory)
-- **Config**: `~/.config/warmswap/config.json` (profiles registry, settings)
-- **Logs**: `~/.config/warmswap/warmswap.log` (command history, errors; size-capped, rotated; no sensitive data)
-- **Usage cache**: `~/.config/warmswap/usage-cache.json` (quota % and reset times from statusline; no tokens or credentials)
-- **Hook state**: Advisor debounce tracker in `<configDir>/warmswap/` (one-per-5%-step per session)
-- **Keepalive schedule**: PID file in `~/.config/warmswap/keepalive/` (process bookkeeping, no credentials)
+- **Config**: `~/.config/lodestone/config.json` (profiles registry, settings)
+- **Logs**: `~/.config/lodestone/lodestone.log` (command history, errors; size-capped, rotated; no sensitive data)
+- **Usage cache**: `~/.config/lodestone/usage-cache.json` (quota % and reset times from statusline; no tokens or credentials)
+- **Hook state**: Advisor debounce tracker in `<configDir>/lodestone/` (one-per-5%-step per session)
+- **Keepalive schedule**: PID file in `~/.config/lodestone/keepalive/` (process bookkeeping, no credentials)
 
-## What warmswap never does
+## What lodestone never does
 
 - ❌ Store, copy, or migrate OAuth tokens
 - ❌ Transmit credentials anywhere except `api.anthropic.com` over TLS
@@ -72,7 +72,7 @@ We will acknowledge receipt within 48 hours and commit to a patch timeline.
 - **Package contents**: `npm pack --dry-run` lists exactly what ships. No build-time injection or hidden files.
 - **Dependencies**: `npm ls --production` confirms zero runtime dependencies
 - **Code review**: All source in `src/` is auditable TypeScript → JavaScript. No obfuscation, no bundling.
-- **Logs**: Plain text in `~/.config/warmswap/warmswap.log`, readable by the user
+- **Logs**: Plain text in `~/.config/lodestone/lodestone.log`, readable by the user
 
 ## Privacy by default
 

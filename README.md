@@ -1,4 +1,4 @@
-# warmswap
+# lodestone
 
 > Switch Claude Code accounts without torching your usage limits: isolated per-account profiles + automated context handoffs, measured.
 
@@ -22,18 +22,18 @@ When you switch accounts mid-session (via `/login` or by picking another account
 
 **Preserve the prompt cache across accounts.** Caches are keyed at the organization level and enforced server-side. Switching accounts means a cache miss, always. See [docs/research/01 final verdict](docs/research/01-prompt-caching.md#final-verdict-on-cross-account-cache-access-re-verified-2026-07-12-1000-check) for the full technical audit. 
 
-What warmswap *does* do: **minimize what must cross the boundary** — replace a ~150k-token conversation replay with a ~2k-token structured handoff.
+What lodestone *does* do: **minimize what must cross the boundary** — replace a ~150k-token conversation replay with a ~2k-token structured handoff.
 
 ---
 
-## What warmswap does
+## What lodestone does
 
 ### **Profiles** — isolated accounts
 One `CLAUDE_CONFIG_DIR` per account. Your existing `~/.claude` is adopted untouched as `personal`. Create more:
 
 ```bash
-warmswap profile add work
-warmswap login work
+lodestone profile add work
+lodestone login work
 ```
 
 Profiles are fully isolated: auth, settings, session history, all independent.
@@ -43,7 +43,7 @@ Three tiers (user follows the recommended path via the advisor):
 
 1. **Tier 1 (recommended): `/handoff` skill in-session** — write a handoff from live conversation knowledge, to `.claude/handoff/latest.md`. Zero extra cost; runs against a warm cache. The advisor nudges this while the session is alive (see below).
 
-2. **Tier 2: `warmswap handoff --distill`** — after leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
+2. **Tier 2: `lodestone handoff --distill`** — after leaving the session but within the cache TTL (≤55 min). Resumes and distills via a fork, reading at 0.1×. Cold-cache guard: refuses if idle >55min without `--force`.
 
 3. **Tier 3 (floor, always on): Auto-snapshot** — deterministic extraction from transcripts (goal, recent prompts, files, todos, git state, last response) saved by `SessionEnd` and `PreCompact` hooks. Always there, free, no LLM required.
 
@@ -62,7 +62,7 @@ The receiving Claude verifies against the live tree and continues. At ~2k tokens
 
 ### **Switch workflow** — account handoff in one command
 ```bash
-warmswap switch work
+lodestone switch work
 ```
 
 This orchestrates: snapshot current session → distill (if desired) → launch Claude under the target account's `CLAUDE_CONFIG_DIR` in the same directory, where the SessionStart hook injects the handoff. It prints a measured cost comparison first — see the [feature tour](#feature-tour--real-captured-output) for real captured output (96% less on a real 450k-token session).
@@ -71,15 +71,15 @@ This orchestrates: snapshot current session → distill (if desired) → launch 
 Watches your real usage quota (real data from Claude Code's statusline or opt-in OAuth endpoint). At ≥85% of 5-hour window (or ≥90% weekly), emits a nudge:
 
 ```
-⚠ warmswap: 5-hour window at 87% — cache is warm.
-  Use /handoff in-session (free), then: warmswap switch work
+⚠ lodestone: 5-hour window at 87% — cache is warm.
+  Use /handoff in-session (free), then: lodestone switch work
 ```
 
 Shows once per 5%-step per session. Never blocks.
 
 ### **Measure** — see what your past switches actually cost
 ```bash
-warmswap audit
+lodestone audit
 ```
 
 Scans your profile history for explicit handoff events (via `consumedBy` metadata) and heuristic boundaries (same project, A→B within 30 min). Reports per event:
@@ -95,7 +95,7 @@ Session A → B (2026-07-12 14:22)
 
 ### **Dashboard** — live profile & session view
 ```bash
-warmswap dash
+lodestone dash
 ```
 
 Full-screen ANSI TUI (q to quit, 2s refresh):
@@ -104,18 +104,18 @@ Full-screen ANSI TUI (q to quit, 2s refresh):
 - Switch-tax panel: naive vs. handoff cost for the current project
 - Advisor line: nudge state and keepalive status
 
-`warmswap dash --once` for a single frame (test/CI use).
+`lodestone dash --once` for a single frame (test/CI use).
 
 ### **Keepalive** — warm cache on switch-back
 When switching to account B intending to return to A, the cache on A dies after 1 hour idle. A periodic "ping" on A (via `--resume --fork-session --max-turns 1`) costs ~0.1×C weighted and refreshes the TTL:
 
 ```bash
-warmswap switch work --keep-warm 90m
+lodestone switch work --keep-warm 90m
 ```
 
 Schedules 3 pings (default, configurable) at 52-minute intervals over 90 minutes. Each ping prints its cost before running. Skipped if A's 5-hour window ≥80% (guardrail: don't burn tokens).
 
-Standalone: `warmswap keepalive personal --for 5m` / `--stop`.
+Standalone: `lodestone keepalive personal --for 5m` / `--stop`.
 
 ---
 
@@ -123,9 +123,9 @@ Standalone: `warmswap keepalive personal --for 5m` / `--stop`.
 
 Even on one account, your cache expires (B2: >1 hour idle) and resets (B3: 5-hour or weekly limits). The same handoff mechanism that crosses accounts works within the account:
 
-- **B2 (cache expiry >1h):** Use `warmswap refresh` to capture a handoff, then `/clear` the bloated context. The session-start hook injects the handoff, and you resume from a clean slate at ~2k tokens instead of replaying ~150k.
-- **B3 (wall: 5h or weekly limit):** Enable `trail mode` (`warmswap trail on`) to capture continuously during a session with fixed sections (goal, state, decisions, files, next), capped at ~1.5k tokens. When the limit resets, start a fresh session and the trail loads automatically — same cheap re-entry. Cost: ≈10–40k weighted per session (one to four ordinary turns), which is insurance for the wall surprise. Trail is opt-in; documented costs up-front.
-- **Refresh in VS Code:** The companion extension adds "Refresh In Place…" to the menu, wiring `warmswap refresh` without leaving the IDE.
+- **B2 (cache expiry >1h):** Use `lodestone refresh` to capture a handoff, then `/clear` the bloated context. The session-start hook injects the handoff, and you resume from a clean slate at ~2k tokens instead of replaying ~150k.
+- **B3 (wall: 5h or weekly limit):** Enable `trail mode` (`lodestone trail on`) to capture continuously during a session with fixed sections (goal, state, decisions, files, next), capped at ~1.5k tokens. When the limit resets, start a fresh session and the trail loads automatically — same cheap re-entry. Cost: ≈10–40k weighted per session (one to four ordinary turns), which is insurance for the wall surprise. Trail is opt-in; documented costs up-front.
+- **Refresh in VS Code:** The companion extension adds "Refresh In Place…" to the menu, wiring `lodestone refresh` without leaving the IDE.
 
 The tool's honest scope for single-account users: **every boundary (cache expiry, wall, voluntary shed) now costs ≈2×(S+H) instead of ≈2×C**, where S is session preamble (~15–25k), H is carried state (~1–2.5k), and C is live context (~100–450k). That's the win whether you switch accounts or stay on one. Without a handoff, the first turn after a boundary replays the whole conversation.
 
@@ -137,45 +137,45 @@ For B4 (voluntary shed with warm cache), native `/compact` is cheaper and recomm
 
 **Install:**
 ```bash
-npm install -g warmswap
+npm install -g lodestone-cli
 ```
 
 Or use via `npx`:
 ```bash
-npx warmswap --help
+npx lodestone --help
 ```
 
 **One-time setup:**
 ```bash
 # Add your two accounts
-warmswap profile add work  # default: ~/.claude-profiles/work
-warmswap login work
+lodestone profile add work  # default: ~/.claude-profiles/work
+lodestone login work
 
 # Install hooks into all profiles
-warmswap init
+lodestone init
 
 # (optional) Enable real usage data from Anthropic endpoint
-warmswap config set realUsage on
+lodestone config set realUsage on
 ```
 
 **Daily flow:**
 1. Work on `personal` (or `work`)
-2. When the session is alive and you want to switch: type `/handoff` (Tier 1, recommended) or run `warmswap handoff --distill` (Tier 2)
-3. Run `warmswap switch work`
+2. When the session is alive and you want to switch: type `/handoff` (Tier 1, recommended) or run `lodestone handoff --distill` (Tier 2)
+3. Run `lodestone switch work`
 4. Claude on `work` sees the handoff and continues
 
 **Check status anytime:**
 ```bash
-warmswap status        # per-profile burn, active sessions, switch cost
-warmswap dash          # live TUI (or --once for one frame)
-warmswap doctor        # diagnose setup
+lodestone status        # per-profile burn, active sessions, switch cost
+lodestone dash          # live TUI (or --once for one frame)
+lodestone doctor        # diagnose setup
 ```
 
 ---
 
 ## VS Code extension
 
-A lightweight VS Code companion extension brings warmswap quota monitoring and account switching into your editor's status bar, without leaving the IDE.
+A lightweight VS Code companion extension brings lodestone quota monitoring and account switching into your editor's status bar, without leaving the IDE.
 
 **What it shows:**
 - Status bar item with current profile, 5h quota %, and weekly quota %
@@ -186,24 +186,24 @@ A lightweight VS Code companion extension brings warmswap quota monitoring and a
 
 Once published to the VS Code Marketplace:
 ```bash
-# Search "warmswap" in VS Code Extensions, or
-code --install-extension warmswap-vscode
+# Search "lodestone" in VS Code Extensions, or
+code --install-extension lodestone-vscode
 ```
 
 For manual installation from source (or pre-release .vsix):
 ```bash
 # Build: cd vscode && npm install && npm run compile
 # Package: npx @vscode/vsce package
-# Install: code --install-extension warmswap-vscode-0.1.0.vsix
+# Install: code --install-extension lodestone-vscode-0.1.0.vsix
 ```
 
 **Requirements:**
-- warmswap CLI installed: `npm install -g warmswap` or `WARMSWAP_BIN=/path/to/warmswap` env var
+- lodestone CLI installed: `npm install -g lodestone-cli` or `LODESTONE_BIN=/path/to/lodestone` env var
 - VS Code 1.85+
 
-**Privacy:** Reads your local warmswap config and usage cache; runs the CLI in the integrated terminal; makes no external requests except when you opt in to real usage data (which reads Anthropic's usage endpoint per ADR-007). No credentials stored or transmitted.
+**Privacy:** Reads your local lodestone config and usage cache; runs the CLI in the integrated terminal; makes no external requests except when you opt in to real usage data (which reads Anthropic's usage endpoint per ADR-007). No credentials stored or transmitted.
 
-**Note:** The official Claude Code extension doesn't execute custom statuslines (anthropic/claude-code #55643), so quota data is not visible there. The warmswap companion extension bridges this gap by reading the same local usage cache and CLI.
+**Note:** The official Claude Code extension doesn't execute custom statuslines (anthropic/claude-code #55643), so quota data is not visible there. The lodestone companion extension bridges this gap by reading the same local usage cache and CLI.
 
 ---
 
@@ -211,7 +211,7 @@ For manual installation from source (or pre-release .vsix):
 
 Everything below was captured verbatim from a real machine during development (a ~450k-token working session on the 1M-context model). Your numbers will differ; the shapes won't.
 
-### `warmswap switch work --stay`
+### `lodestone switch work --stay`
 ```
 handoff ready: .claude/handoff/latest.md (~810 tokens)
 
@@ -221,7 +221,7 @@ switching personal → work in /Users/rahul/Desktop/mem
 (estimates; cache writes are billed 2× — see docs/explainer)
 ```
 
-### `warmswap status`
+### `lodestone status`
 ```
 personal  /Users/rahul/.claude      you@example.com (Your Organization)
   5h window: [█████████████░░░░░░░░░] 60% est
@@ -240,12 +240,12 @@ switch tax now: ≈ 911,940 weighted tokens naive vs ≈ 42,408 with handoff
 
 ### Advisor (UserPromptSubmit hook — shown by Claude Code as a system message)
 ```json
-{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)"},"systemMessage":"warmswap: 5h window at 87% — cache is warm: /handoff now is cheap, then warmswap switch <other>"}
+{"hookSpecificOutput":{"hookEventName":"UserPromptSubmit","additionalContext":"(Claude may suggest running /handoff to write a high-quality handoff while cache is warm, then switching accounts)"},"systemMessage":"lodestone: 5h window at 87% — cache is warm: /handoff now is cheap, then lodestone switch <other>"}
 ```
 
-### `warmswap dash --once`
+### `lodestone dash --once`
 ```
-warmswap dash · 11:30:49 · q quit · r refresh
+lodestone dash · 11:30:49 · q quit · r refresh
 
 personal · you@example.com (Your Organization)
   5h [███████████████] 100% 207% · resets in 2h 57m · (est, target 41%)
@@ -269,7 +269,7 @@ Keepalive plan for personal:
 Keepalive started (pid 11019)
 ```
 
-### `warmswap audit`
+### `lodestone audit`
 On a machine that has never switched profiles yet it honestly reports `No switch events found`; after your first handoff switches it lists each event with context abandoned, actual first-turn cache writes on the target, and the naive-vs-handoff comparison (see `--json` for the schema).
 
 ---
@@ -295,12 +295,12 @@ Full explainer: [docs/explainer/how-claude-code-memory-works.md](docs/explainer/
 ## Real usage data — two layers
 
 ### Layer A: In-session (native, always available)
-Claude Code natively passes `rate_limits` (real quota %) into statusline on every render. Our statusline captures it to `~/.config/warmswap/usage-cache.json` so hooks and status can read it without any API call. The advisor uses this.
+Claude Code natively passes `rate_limits` (real quota %) into statusline on every render. Our statusline captures it to `~/.config/lodestone/usage-cache.json` so hooks and status can read it without any API call. The advisor uses this.
 
 ### Layer B: Cross-profile (opt-in OAuth)
 For checking the other account's quota when it's not running a session:
 ```bash
-warmswap config set realUsage on
+lodestone config set realUsage on
 ```
 
 Uses the OAuth access token from your OS keychain (macOS) or credentials.json (Linux). Token is never stored, copied, or sent anywhere except `api.anthropic.com` over TLS. Responses cached ≥180s. Falls back to JSONL estimation if unavailable or 429-limited.
@@ -319,7 +319,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 - Default: 3 pings (works up to ~3h away)
 
 **Guardrails:**
-- Never enabled by default — always explicit: `warmswap switch work --keep-warm 90m`
+- Never enabled by default — always explicit: `lodestone switch work --keep-warm 90m`
 - Skips if source profile's 5h ≥80% (don't waste quota near the limit)
 - Each ping prints cost before running
 - `--no-session-persistence` supported (verify empirically in your EVALUATION run)
@@ -328,9 +328,9 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 
 ---
 
-## Comparison: warmswap vs. alternatives
+## Comparison: lodestone vs. alternatives
 
-| Tool | What it does | What warmswap adds |
+| Tool | What it does | What lodestone adds |
 |---|---|---|
 | **ccusage** (community) | Analytics dashboard on transcripts | Multi-account, handoff workflow, switch advisor |
 | **Claude Code statusline** (native) | Shows usage %, recent sessions | Cross-profile view, cache TTL countdown, switch cost est. |
@@ -339,7 +339,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 | **Quota VS Code extensions** (10+ in marketplace) | Terminal/editor usage bar | Profiles, cache countdown, switch cost, handoff actions |
 | **Multi-account setups** (manual) | Two `CLAUDE_CONFIG_DIR` env shortcuts | Hooks, handoff, automation, measurement |
 
-**Unique to warmswap:**
+**Unique to lodestone:**
 - Automated, advisor-driven handoff workflow (Tier 1 nudge → Tier 2 distill → Tier 3 fallback)
 - Real quota data (in-session + cross-profile opt-in) feeding advisor & dashboard
 - Switch-cost measurement & audit trail
@@ -351,7 +351,7 @@ When you return to account A after switching to B, the cache is dead if >1 hour 
 ## FAQ
 
 ### **Do I need two paid subscriptions?**
-Yes, both accounts must have their own Pro/Max/Team plan. Organization policies on account sharing are your responsibility to check with your admin. warmswap is a tool for multiplexing your own accounts; it doesn't share credentials.
+Yes, both accounts must have their own Pro/Max/Team plan. Organization policies on account sharing are your responsibility to check with your admin. lodestone is a tool for multiplexing your own accounts; it doesn't share credentials.
 
 ### **Windows support?**
 Best-effort. Built and tested on macOS; Linux works (Keychain replaced by credentials.json). Windows users: Credentials.json path works identically. Hooks should work in PowerShell and WSL. File paths use `\` on native Windows; munging to `-` for project dirs is applied. Report issues with concrete examples.
@@ -377,9 +377,9 @@ Safest stance: test on a non-critical account first.
 Yes, within one account. TTL refresh (hitting the cache to reset the 1h clock) is free. We use this in the keepalive feature. But **TTL is per-account** — switching accounts means cache miss, and there's nothing a client-side tool can do about that. See [research/01](docs/research/01-prompt-caching.md).
 
 ### **How do I know it actually works?**
-`warmswap audit` shows your past switches + cost deltas. `warmswap status` and `dash` show live metrics. The handoff files themselves (`.claude/handoff/latest.md` and archived versions) are human-readable. We include an evaluation methodology in [EVALUATION.md](docs/EVALUATION.md).
+`lodestone audit` shows your past switches + cost deltas. `lodestone status` and `dash` show live metrics. The handoff files themselves (`.claude/handoff/latest.md` and archived versions) are human-readable. We include an evaluation methodology in [EVALUATION.md](docs/EVALUATION.md).
 
-### **Cost of running warmswap itself?**
+### **Cost of running lodestone itself?**
 Zero token cost for the CLI (no API calls except opt-in real-usage endpoint, cached). Hooks run in <2s and exit 0 on failure (logged, never visible). The only token spend is `/handoff` (Tier 1, lives in the session) or `--distill` (Tier 2, optional).
 
 ---
@@ -388,13 +388,13 @@ Zero token cost for the CLI (no API calls except opt-in real-usage endpoint, cac
 
 **Install from npm (when published):**
 ```bash
-npm install -g warmswap
+npm install -g lodestone-cli
 ```
 
 **Dev setup:**
 ```bash
-git clone https://github.com/OWNER/warmswap   # OWNER: replaced at publish time
-cd warmswap
+git clone https://github.com/OWNER/lodestone   # OWNER: replaced at publish time
+cd lodestone
 npm ci
 npm run build
 npm test
@@ -411,7 +411,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development details and fixture priva
 
 ## Support & reporting issues
 
-**Bug reports:** Run `warmswap doctor` and include its output.
+**Bug reports:** Run `lodestone doctor` and include its output.
 
 **Security issues:** See [SECURITY.md](SECURITY.md) for responsible disclosure.
 

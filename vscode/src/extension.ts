@@ -30,8 +30,8 @@ export async function activate(context: vscode.ExtensionContext) {
     vscode.StatusBarAlignment.Right,
     100
   );
-  statusBarItem.name = "warmswap";
-  statusBarItem.command = "warmswap.menu";
+  statusBarItem.name = "lodestone";
+  statusBarItem.command = "lodestone.menu";
   context.subscriptions.push(statusBarItem);
 
   // Initial refresh
@@ -40,12 +40,12 @@ export async function activate(context: vscode.ExtensionContext) {
   // Set up fs.watch on each profile's usage-cache.json
   const registry = loadRegistry();
   for (const profile of registry.profiles) {
-    const cacheFile = join(profile.configDir, "warmswap", "usage-cache.json");
+    const cacheFile = join(profile.configDir, "lodestone", "usage-cache.json");
     try {
       const watcher = watch(cacheFile, () => {
         // fs.watch fires multiple times; debounce with a small delay
-        clearTimeout((globalThis as any).warmswapWatchDebounce);
-        (globalThis as any).warmswapWatchDebounce = setTimeout(
+        clearTimeout((globalThis as any).lodestoneWatchDebounce);
+        (globalThis as any).lodestoneWatchDebounce = setTimeout(
           () => updateStatus(),
           100
         );
@@ -63,29 +63,29 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // Register commands
   context.subscriptions.push(
-    vscode.commands.registerCommand("warmswap.menu", () => handleMenu())
+    vscode.commands.registerCommand("lodestone.menu", () => handleMenu())
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("warmswap.handoffSwitch", () =>
+    vscode.commands.registerCommand("lodestone.handoffSwitch", () =>
       handleHandoffSwitch()
     )
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("warmswap.keepWarm", () =>
+    vscode.commands.registerCommand("lodestone.keepWarm", () =>
       handleKeepWarm()
     )
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("warmswap.openDash", () =>
+    vscode.commands.registerCommand("lodestone.openDash", () =>
       handleOpenDash()
     )
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand("warmswap.refresh", () => updateStatus())
+    vscode.commands.registerCommand("lodestone.refresh", () => updateStatus())
   );
 }
 
@@ -153,7 +153,7 @@ async function updateStatus() {
     // Check for expiry toasts
     const expiryToastMinutes =
       vscode.workspace
-        .getConfiguration("warmswap")
+        .getConfiguration("lodestone")
         .get<number>("expiryToastMinutes") ?? 0;
     if (expiryToastMinutes > 0) {
       const toastDecisions = expiryToastDecisions(
@@ -167,7 +167,7 @@ async function updateStatus() {
     }
   } catch (err) {
     // Graceful degradation
-    statusBarItem.text = "$(error) warmswap error";
+    statusBarItem.text = "$(error) lodestone error";
     statusBarItem.show();
   }
 }
@@ -257,7 +257,7 @@ async function handleMenu() {
   ];
 
   const picked = await vscode.window.showQuickPick(actions, {
-    placeHolder: "warmswap actions",
+    placeHolder: "lodestone actions",
   });
 
   if (!picked) return;
@@ -266,7 +266,7 @@ async function handleMenu() {
     case "handoff":
       return handleHandoffSwitch();
     case "refresh-in-place":
-      return runInTerminal("warmswap refresh");
+      return runInTerminal("lodestone refresh");
     case "trail-toggle":
       return handleTrailToggle();
     case "keepWarm":
@@ -276,7 +276,7 @@ async function handleMenu() {
     case "refresh":
       return updateStatus();
     case "realUsage":
-      return runInTerminal("warmswap config set realUsage on");
+      return runInTerminal("lodestone config set realUsage on");
   }
 }
 
@@ -286,7 +286,7 @@ async function handleMenu() {
 async function handleHandoffSwitch() {
   const registry = loadRegistry();
   if (registry.profiles.length === 0) {
-    vscode.window.showErrorMessage("No warmswap profiles configured");
+    vscode.window.showErrorMessage("No lodestone profiles configured");
     return;
   }
 
@@ -301,7 +301,7 @@ async function handleHandoffSwitch() {
 
   if (!target) return;
 
-  runInTerminal(`warmswap switch ${target.value}`);
+  runInTerminal(`lodestone switch ${target.value}`);
 }
 
 /**
@@ -318,7 +318,7 @@ async function handleTrailToggle() {
     const status = JSON.parse(statusJson);
     const installed = status.installed ?? false;
 
-    const command = installed ? "warmswap trail off" : "warmswap trail on";
+    const command = installed ? "lodestone trail off" : "lodestone trail on";
     runInTerminal(command);
   } catch {
     vscode.window.showErrorMessage("Failed to toggle trail mode");
@@ -331,7 +331,7 @@ async function handleTrailToggle() {
 async function handleKeepWarm() {
   const registry = loadRegistry();
   if (registry.profiles.length === 0) {
-    vscode.window.showErrorMessage("No warmswap profiles configured");
+    vscode.window.showErrorMessage("No lodestone profiles configured");
     return;
   }
 
@@ -351,14 +351,14 @@ async function handleKeepWarm() {
 
   if (!duration) return;
 
-  runInTerminal(`warmswap keepalive ${picked.value} --for ${duration}`);
+  runInTerminal(`lodestone keepalive ${picked.value} --for ${duration}`);
 }
 
 /**
  * Handle open dashboard.
  */
 async function handleOpenDash() {
-  runInTerminal("warmswap dash");
+  runInTerminal("lodestone dash");
 }
 
 /**
@@ -368,7 +368,7 @@ async function showExpiryToast(
   folderName: string,
   minutesRemaining: number
 ) {
-  const message = `warmswap: cache for ${folderName} expires in ~${minutesRemaining}m`;
+  const message = `lodestone: cache for ${folderName} expires in ~${minutesRemaining}m`;
   const choice = await vscode.window.showWarningMessage(
     message,
     "Keep warm",
@@ -387,8 +387,8 @@ async function showExpiryToast(
  */
 function runInTerminal(command: string) {
   const terminal =
-    vscode.window.terminals.find((t) => t.name === "warmswap") ||
-    vscode.window.createTerminal("warmswap");
+    vscode.window.terminals.find((t) => t.name === "lodestone") ||
+    vscode.window.createTerminal("lodestone");
 
   terminal.show();
   terminal.sendText(command);

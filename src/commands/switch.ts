@@ -47,7 +47,7 @@ export async function switchCmd(
     const targetProfileName = positionals[0] as string | undefined;
 
     if (!targetProfileName) {
-      console.error("warmswap switch: missing target profile name");
+      console.error("lodestone switch: missing target profile name");
       return 2;
     }
 
@@ -55,10 +55,10 @@ export async function switchCmd(
     const currentProfileInfo = resolveActingProfile(opts.profile);
     if (!currentProfileInfo) {
       if (opts.profile) {
-        console.error(`warmswap switch: profile not found: ${opts.profile}`);
+        console.error(`lodestone switch: profile not found: ${opts.profile}`);
       } else {
         console.error(
-          `warmswap switch: no profiles registered — run: warmswap profile add <name>`
+          `lodestone switch: no profiles registered — run: lodestone profile add <name>`
         );
       }
       return 1;
@@ -69,7 +69,7 @@ export async function switchCmd(
     const targetProfileCfg = config.profiles[targetProfileName];
     if (!targetProfileCfg) {
       console.error(
-        `warmswap switch: profile not found: ${targetProfileName}`
+        `lodestone switch: profile not found: ${targetProfileName}`
       );
       return 1;
     }
@@ -77,7 +77,7 @@ export async function switchCmd(
     // Check that target differs from current
     if (currentProfileInfo.name === targetProfileName) {
       console.error(
-        `warmswap switch: target profile is the same as current (${targetProfileName})`
+        `lodestone switch: target profile is the same as current (${targetProfileName})`
       );
       return 1;
     }
@@ -165,7 +165,7 @@ export async function switchCmd(
       if (!opts.json) {
         console.log();
         console.log(
-          "tip: run `warmswap init` once and the new session picks this up automatically"
+          "tip: run `lodestone init` once and the new session picks this up automatically"
         );
       }
 
@@ -214,7 +214,7 @@ export async function switchCmd(
     return exitCode;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap switch: ${msg}`);
+    console.error(`lodestone switch: ${msg}`);
     return 1;
   }
 }

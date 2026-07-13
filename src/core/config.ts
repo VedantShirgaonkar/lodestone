@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, copyFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { warmswapConfigPath } from "./paths.js";
+import { lodestoneConfigPath } from "./paths.js";
 
 export interface ProfileConfig {
   configDir: string;
@@ -30,39 +30,39 @@ export interface SettingsConfig {
   keepalive?: KeepaliveSettings;
 }
 
-export interface WarmswapConfig {
+export interface LodestoneConfig {
   schema: number;
   profiles: Record<string, ProfileConfig>;
   settings: SettingsConfig;
 }
 
 /**
- * Load the warmswap config from disk.
+ * Load the lodestone config from disk.
  * Returns a default config if the file doesn't exist.
  */
-export function loadConfig(configPath?: string): WarmswapConfig {
-  const path = configPath ?? warmswapConfigPath();
+export function loadConfig(configPath?: string): LodestoneConfig {
+  const path = configPath ?? lodestoneConfigPath();
   if (!existsSync(path)) {
     return defaultConfig();
   }
   try {
     const raw = readFileSync(path, "utf8");
     const parsed = JSON.parse(raw);
-    return parsed as WarmswapConfig;
+    return parsed as LodestoneConfig;
   } catch {
     return defaultConfig();
   }
 }
 
 /**
- * Save the warmswap config to disk atomically (write to tmp, then rename).
+ * Save the lodestone config to disk atomically (write to tmp, then rename).
  * Creates a backup (.bak) before overwriting.
  */
 export function saveConfig(
-  config: WarmswapConfig,
+  config: LodestoneConfig,
   configPath?: string
 ): void {
-  const path = configPath ?? warmswapConfigPath();
+  const path = configPath ?? lodestoneConfigPath();
   const dir = dirname(path);
 
   // Ensure directory exists
@@ -81,7 +81,7 @@ export function saveConfig(
   renameSync(tmpPath, path);
 }
 
-function defaultConfig(): WarmswapConfig {
+function defaultConfig(): LodestoneConfig {
   return {
     schema: 1,
     profiles: {},

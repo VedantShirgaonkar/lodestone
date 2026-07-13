@@ -14,8 +14,8 @@ test("util-log: logError and logInfo don't throw", () => {
 });
 
 test("util-log: logs are written to expected directory", () => {
-  const logDir = join(homedir(), ".config", "warmswap");
-  const logFile = join(logDir, "warmswap.log");
+  const logDir = join(homedir(), ".config", "lodestone");
+  const logFile = join(logDir, "lodestone.log");
 
   // Clear any existing log to start fresh
   if (existsSync(logFile)) {

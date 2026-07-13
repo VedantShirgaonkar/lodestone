@@ -14,7 +14,7 @@ interface CommandOptions {
 }
 
 /**
- * warmswap refresh — ensure a fresh handoff for /clear-based carry
+ * lodestone refresh — ensure a fresh handoff for /clear-based carry
  *
  * refresh [--distill]
  *
@@ -40,7 +40,7 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
     const profile = resolveActingProfile();
 
     if (!profile) {
-      throw new Error("No active profile found. Set CLAUDE_CONFIG_DIR or run: warmswap profile add");
+      throw new Error("No active profile found. Set CLAUDE_CONFIG_DIR or run: lodestone profile add");
     }
 
     // Find the latest session
@@ -94,7 +94,7 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap refresh: ${message}\n`);
+    stderr.write(`lodestone refresh: ${message}\n`);
     return 1;
   }
 }

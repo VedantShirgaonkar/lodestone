@@ -11,7 +11,7 @@ export async function launch(
   opts: CommandOptions
 ): Promise<number> {
   if (args.length === 0 || !args[0]) {
-    console.error("warmswap launch: missing profile name");
+    console.error("lodestone launch: missing profile name");
     return 2;
   }
 
@@ -25,7 +25,7 @@ export async function launch(
     const config = loadConfig();
     const profileCfg = config.profiles[profileName];
     if (!profileCfg) {
-      console.error(`warmswap launch: profile not found: ${profileName}`);
+      console.error(`lodestone launch: profile not found: ${profileName}`);
       return 1;
     }
 
@@ -34,7 +34,7 @@ export async function launch(
     return launchInteractive(profile, claudeArgs);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap launch: ${msg}`);
+    console.error(`lodestone launch: ${msg}`);
     return 1;
   }
 }

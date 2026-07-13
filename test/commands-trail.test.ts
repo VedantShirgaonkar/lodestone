@@ -7,8 +7,8 @@ import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "..", "..", "bin/warmswap.js");
-const testDir = resolve(tmpdir(), `warmswap-test-trail-${Date.now()}`);
+const CLI = resolve(__testDir, "..", "..", "bin/lodestone.js");
+const testDir = resolve(tmpdir(), `lodestone-test-trail-${Date.now()}`);
 
 function runTrail(args: string[], cwd: string): Promise<{ stdout: string; stderr: string; code: number }> {
   return new Promise((resolvePromise) => {
@@ -38,7 +38,7 @@ test("trail: on creates rules and skill files", async () => {
   assert.equal(code, 0, `Expected code 0 but got ${code}. stderr: ${stderr}`);
   assert.match(stdout, /installed/);
 
-  const rulesPath = join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+  const rulesPath = join(projectRoot, ".claude", "rules", "lodestone-trail.md");
   const skillPath = join(projectRoot, ".claude", "skills", "trail", "SKILL.md");
 
   const rulesExists = await stat(rulesPath).then(() => true).catch(() => false);
@@ -48,7 +48,7 @@ test("trail: on creates rules and skill files", async () => {
   assert.ok(skillExists, `Skill file should exist at ${skillPath}`);
 
   const rulesContent = await readFile(rulesPath, "utf8");
-  assert.match(rulesContent, /Session trail \(warmswap\)/);
+  assert.match(rulesContent, /Session trail \(lodestone\)/);
   assert.match(rulesContent, /without being asked/, "rules must command Claude directly");
   assert.match(rulesContent, /Never write secrets/);
 
@@ -68,7 +68,7 @@ test("trail: off removes rules and skill files", async () => {
   assert.equal(code, 0);
   assert.match(stdout, /disabled/);
 
-  const rulesPath = join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+  const rulesPath = join(projectRoot, ".claude", "rules", "lodestone-trail.md");
   const rulesExists = await stat(rulesPath).then(() => true).catch(() => false);
   assert.ok(!rulesExists, `Rules file should not exist after turning off`);
 
@@ -128,7 +128,7 @@ test("trail: on is idempotent", async () => {
   assert.equal(code1, 0);
   assert.equal(code2, 0);
 
-  const rulesPath = join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+  const rulesPath = join(projectRoot, ".claude", "rules", "lodestone-trail.md");
   const rulesExists = await stat(rulesPath).then(() => true).catch(() => false);
   assert.ok(rulesExists);
 

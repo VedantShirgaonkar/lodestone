@@ -15,7 +15,7 @@ export interface SettingsConfig {
 
 /**
  * Install hooks into a settings.json file.
- * Idempotent: detects existing hooks by command substring ("warmswap hook <type>").
+ * Idempotent: detects existing hooks by command substring ("lodestone hook <type>").
  * If our subcommand exists but the full command differs, UPDATES it in place.
  * Backs up to settings.json.bak before writing.
  * Throws on invalid JSON or write error.
@@ -114,7 +114,7 @@ export function installHooks(
 
 /**
  * Uninstall hooks from settings.json.
- * Removes entries containing "warmswap hook" substring.
+ * Removes entries containing "lodestone hook" substring.
  * Idempotent.
  */
 export function uninstallHooks(configDirOrSettingsPath: string): void {
@@ -154,7 +154,7 @@ export function uninstallHooks(configDirOrSettingsPath: string): void {
                 "command" in ih &&
                 typeof (ih as Record<string, unknown>).command === "string" &&
                 ((ih as Record<string, unknown>).command as string).includes(
-                  "warmswap hook"
+                  "lodestone hook"
                 )
             );
           }
@@ -192,7 +192,7 @@ function isSettingsPath(path: string): boolean {
 /**
  * Helper: create or update hook in hooksObj.
  * Idempotent by command substring matching.
- * If our warmswap hook subcommand exists but the full command differs, UPDATE it in place.
+ * If our lodestone hook subcommand exists but the full command differs, UPDATE it in place.
  * Returns {changed: boolean}.
  */
 function createOrUpdateHook(
@@ -219,8 +219,8 @@ function createOrUpdateHook(
             ) {
               const existingCmd = (ih as Record<string, unknown>)
                 .command as string;
-              // Detect if this is our hook by warmswap hook substring
-              if (existingCmd.includes("warmswap hook")) {
+              // Detect if this is our hook by lodestone hook substring
+              if (existingCmd.includes("lodestone hook")) {
                 // Check if it's the same command
                 if (existingCmd === command) {
                   return { changed: false }; // Already present, no change needed

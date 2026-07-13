@@ -1,14 +1,14 @@
 {
-  "name": "warmswap",
+  "name": "lodestone-cli",
   "version": "0.1.0",
-  "description": "Switch Claude Code accounts without burning your usage limits: isolated per-account profiles + automated context handoffs, measured.",
+  "description": "Stop paying Claude Code's cache tax: usage & cache monitoring, context handoffs, account switching — one command: lodestone.",
   "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=20"
   },
   "bin": {
-    "warmswap": "bin/warmswap.js"
+    "lodestone": "bin/lodestone.js"
   },
   "files": [
     "bin",
@@ -39,12 +39,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/OWNER/warmswap"
+    "url": "https://github.com/VedantShirgaonkar/lodestone"
   },
   "bugs": {
-    "url": "https://github.com/OWNER/warmswap/issues"
+    "url": "https://github.com/VedantShirgaonkar/lodestone/issues"
   },
-  "homepage": "https://github.com/OWNER/warmswap",
+  "homepage": "https://github.com/VedantShirgaonkar/lodestone",
   "author": "",
   "devDependencies": {
     "@types/node": "^22.10.0",

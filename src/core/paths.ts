@@ -29,10 +29,10 @@ export function handoffDirFor(projectRoot: string): string {
 
 /**
  * Get the trail rules file path for a project root.
- * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/rules/warmswap-trail.md`
+ * E.g. `/home/user/my-project` -> `/home/user/my-project/.claude/rules/lodestone-trail.md`
  */
 export function trailRulesPathFor(projectRoot: string): string {
-  return join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+  return join(projectRoot, ".claude", "rules", "lodestone-trail.md");
 }
 
 /**
@@ -60,14 +60,14 @@ export function trailMetaPathFor(projectRoot: string): string {
 }
 
 /**
- * Get the warmswap config path.
- * $XDG_CONFIG_HOME/warmswap/config.json, fallback to ~/.config/warmswap/config.json
+ * Get the lodestone config path.
+ * $XDG_CONFIG_HOME/lodestone/config.json, fallback to ~/.config/lodestone/config.json
  */
-export function warmswapConfigPath(): string {
+export function lodestoneConfigPath(): string {
   const xdgConfigHome = process.env.XDG_CONFIG_HOME;
   const configDir = xdgConfigHome
-    ? join(xdgConfigHome, "warmswap")
-    : join(homedir(), ".config", "warmswap");
+    ? join(xdgConfigHome, "lodestone")
+    : join(homedir(), ".config", "lodestone");
   return join(configDir, "config.json");
 }
 

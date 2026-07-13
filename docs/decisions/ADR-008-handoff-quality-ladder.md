@@ -8,7 +8,7 @@ User critique (correct): purely deterministic extraction — "basic string match
 ## Decision
 Three tiers, explicitly ranked, with the product steering users to the top:
 1. **Tier 1 (recommended): `/handoff` skill in-session** — live Claude writes the six sections from full conversational knowledge. The advisor (ADR-007 thresholds) nudges this while the session is alive. `switch` output and README teach it as the primary flow.
-2. **Tier 2: `warmswap handoff --distill`** — after leaving the session but within the cache TTL; resume-fork distillation, cold-cache guard (>55min idle refuses without `--force`).
+2. **Tier 2: `lodestone handoff --distill`** — after leaving the session but within the cache TTL; resume-fork distillation, cold-cache guard (>55min idle refuses without `--force`).
 3. **Tier 3 (floor, always on, free): deterministic auto-snapshot** — SessionEnd/PreCompact hooks; harvests structure (files, todos, git, compact summaries — themselves LLM prose already paid for) so there is ALWAYS a handoff even when the user forgot everything.
 
 Supporting changes: snapshot output gains a **completeness score** (goal found? decisions? next steps?) and prints "thin handoff — consider /handoff or --distill" when weak; rehydration frame already tells the receiving Claude to verify against the working tree.

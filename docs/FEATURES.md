@@ -2,7 +2,7 @@
 
 The user-required informational features, audited per surface. "In-session" means inside a Claude Code conversation — which is the same engine whether you run the CLI in a terminal or the official Claude Code VS Code extension, with one exception noted below.
 
-| Feature | Terminal (CLI commands) | In-session (CLI) | In-session (official VS Code ext.) | warmswap VS Code extension |
+| Feature | Terminal (CLI commands) | In-session (CLI) | In-session (official VS Code ext.) | lodestone VS Code extension |
 |---|---|---|---|---|
 | **Intimation: when to hand off** | `status` footer + `dash` advisor line | statusline `⚠ handoff?` glyph **and** advisor message at ≥85%/90% ("cache is warm: /handoff now is cheap…") | advisor message ✅ (hooks run identically); statusline glyph ❌ (see note) | status-bar warning color + advisor line in the popover |
 | **Time till warm cache disappears** | `status` ("cache warm ~43m left") + `dash` per-session countdowns | statusline `cache 43m` / `cache cold` segment | ❌ via statusline (note) → covered by companion extension | per-workspace cache countdown lines + optional expiry toast (configurable) |
@@ -10,9 +10,9 @@ The user-required informational features, audited per surface. "In-session" mean
 | **How much you saved (history)** | `audit` / `audit --json` per-event + totals + per-class breakdown | — (post-hoc metric) | — | savings totals in popover with switch/refresh/post-reset breakdown (from `audit --json`) |
 | **Real quota: 5h/weekly %, resets, pacing** | `status` bars + `dash` (live vs est labeled) | statusline `5h 87%▲87 (2h10m) · wk 25%` | ❌ via statusline (note) → companion ext. or opt-in OAuth | quota bars per profile, both accounts side-by-side, live/est labeled |
 | **Handoff quality visibility** | `snapshot`/`handoff`/`switch` print `handoff quality: n/5` + thin-handoff warning | `/handoff` skill writes and reports the file | same ✅ | — (quality shown at creation time by the CLI) |
-| **Same-account refresh (/clear + auto-inject)** | `refresh` command (prints 2-step flow) | `/refresh` skill (compose and tell user to `/clear`) | advisor copy names refresh as the cold-cache path ✅ | "Refresh In Place…" menu action → `warmswap refresh` |
-| **Trail mode (continuous capture)** | `trail on/off/status` | rules + skill maintain `.claude/handoff/trail.md` + advisor staleness nudge | advisor nudge ✅; `/trail` skill controls it | "Trail Mode: toggle" menu action wires `warmswap trail on/off` |
+| **Same-account refresh (/clear + auto-inject)** | `refresh` command (prints 2-step flow) | `/refresh` skill (compose and tell user to `/clear`) | advisor copy names refresh as the cold-cache path ✅ | "Refresh In Place…" menu action → `lodestone refresh` |
+| **Trail mode (continuous capture)** | `trail on/off/status` | rules + skill maintain `.claude/handoff/trail.md` + advisor staleness nudge | advisor nudge ✅; `/trail` skill controls it | "Trail Mode: toggle" menu action wires `lodestone trail on/off` |
 
-**The one gap and its fix:** the official Claude Code VS Code extension does not execute custom statusline commands (open upstream feature requests #55643, #20207, #11165, #21265). Hooks and skills work there unchanged — so the advisor intimation and `/handoff` are fully present — but the always-visible bar (quota, cache timer) is not. That's precisely what the **warmswap VS Code extension** restores, natively in the editor's status bar, plus things the statusline can't do: both accounts at once, savings history, and one-click actions.
+**The one gap and its fix:** the official Claude Code VS Code extension does not execute custom statusline commands (open upstream feature requests #55643, #20207, #11165, #21265). Hooks and skills work there unchanged — so the advisor intimation and `/handoff` are fully present — but the always-visible bar (quota, cache timer) is not. That's precisely what the **lodestone VS Code extension** restores, natively in the editor's status bar, plus things the statusline can't do: both accounts at once, savings history, and one-click actions.
 
 **Data honesty rule across all surfaces:** every figure is labeled `live` (from Claude Code's native rate_limits feed or the opt-in usage endpoint) or `est` (local burn model); missing data renders as "no data", never as a fake 0%.

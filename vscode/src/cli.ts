@@ -5,20 +5,20 @@ const cache: CommandCache = {};
 const CACHE_TTL_MS = 60 * 1000; // 60s cache per command
 
 /**
- * Locate the warmswap CLI binary.
- * 1. Check env WARMSWAP_BIN override
- * 2. Try to spawn 'warmswap' via PATH
+ * Locate the lodestone CLI binary.
+ * 1. Check env LODESTONE_BIN override
+ * 2. Try to spawn 'lodestone' via PATH
  * 3. Return null if missing
  */
 export async function locateCliAsync(): Promise<string | null> {
-  if (process.env.WARMSWAP_BIN) {
-    return process.env.WARMSWAP_BIN;
+  if (process.env.LODESTONE_BIN) {
+    return process.env.LODESTONE_BIN;
   }
 
   try {
-    // Try running 'warmswap --version' to probe PATH
-    execSync("warmswap --version", { stdio: "pipe", timeout: 5000 });
-    return "warmswap";
+    // Try running 'lodestone --version' to probe PATH
+    execSync("lodestone --version", { stdio: "pipe", timeout: 5000 });
+    return "lodestone";
   } catch {
     return null;
   }
@@ -28,14 +28,14 @@ export async function locateCliAsync(): Promise<string | null> {
  * Synchronous fallback for locating CLI (for extension init).
  */
 export function locateCli(): string | null {
-  if (process.env.WARMSWAP_BIN) {
-    return process.env.WARMSWAP_BIN;
+  if (process.env.LODESTONE_BIN) {
+    return process.env.LODESTONE_BIN;
   }
 
   try {
-    // Try running 'warmswap --version' to probe PATH
-    execSync("warmswap --version", { stdio: "pipe" });
-    return "warmswap";
+    // Try running 'lodestone --version' to probe PATH
+    execSync("lodestone --version", { stdio: "pipe" });
+    return "lodestone";
   } catch {
     return null;
   }

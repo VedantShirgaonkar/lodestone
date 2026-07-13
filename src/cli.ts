@@ -56,7 +56,7 @@ export async function main(argv: string[]): Promise<number> {
 
     // Handle global --version
     if (globalOpts.version) {
-      console.log(`warmswap ${VERSION}`);
+      console.log(`lodestone ${VERSION}`);
       return 0;
     }
 
@@ -73,7 +73,7 @@ export async function main(argv: string[]): Promise<number> {
     }
 
     // Shared flags (--json, --profile <name>) may appear after the command too:
-    // strip them for warmswap's own workflow commands. launch/login/bare-launch
+    // strip them for lodestone's own workflow commands. launch/login/bare-launch
     // are exempt — everything after the profile name belongs to claude verbatim.
     const isPassthrough =
       command === "launch" || command === "login" || !COMMAND_NAMES.has(command);
@@ -180,7 +180,7 @@ export async function main(argv: string[]): Promise<number> {
     const message =
       err instanceof Error ? err.message : String(err);
     printError(message);
-    if (process.env.WARMSWAP_DEBUG) {
+    if (process.env.LODESTONE_DEBUG) {
       console.error(err);
     }
     return 1;
@@ -242,9 +242,9 @@ function parseGlobalArgs(argv: string[]): {
 }
 
 function printGlobalHelp(): void {
-  console.log(`warmswap — switch Claude Code accounts with measured context handoffs
+  console.log(`lodestone — switch Claude Code accounts with measured context handoffs
 
-Usage: warmswap [--version] [--help] [--json] [--profile <name>] <command> [options]
+Usage: lodestone [--version] [--help] [--json] [--profile <name>] <command> [options]
 
 Global options:
   --version            Show version
@@ -275,9 +275,9 @@ help                   Show command help`);
 
 function printCommandHelp(command: string): void {
   const helps: Record<string, string> = {
-    profile: `warmswap profile — manage profiles
+    profile: `lodestone profile — manage profiles
 
-Usage: warmswap profile <subcommand>
+Usage: lodestone profile <subcommand>
 
 Subcommands:
   add <name>           Create profile
@@ -285,46 +285,46 @@ Subcommands:
   remove <name>        Unregister profile (does not delete dir)
   rename <old> <new>   Rename profile`,
 
-    launch: `warmswap launch — launch Claude on a profile
+    launch: `lodestone launch — launch Claude on a profile
 
-Usage: warmswap launch <profile> [-- [claude args]]`,
+Usage: lodestone launch <profile> [-- [claude args]]`,
 
-    login: `warmswap login — authenticate a profile
+    login: `lodestone login — authenticate a profile
 
-Usage: warmswap login <profile>`,
+Usage: lodestone login <profile>`,
 
-    snapshot: `warmswap snapshot — capture current session as handoff file
+    snapshot: `lodestone snapshot — capture current session as handoff file
 
-Usage: warmswap snapshot [--session <id>] [--out <path>] [--quiet]`,
+Usage: lodestone snapshot [--session <id>] [--out <path>] [--quiet]`,
 
-    handoff: `warmswap handoff — snapshot + optional distillation
+    handoff: `lodestone handoff — snapshot + optional distillation
 
-Usage: warmswap handoff [--distill] [--force] [--session <id>]`,
+Usage: lodestone handoff [--distill] [--force] [--session <id>]`,
 
-    switch: `warmswap switch — switch to a profile with handoff
+    switch: `lodestone switch — switch to a profile with handoff
 
-Usage: warmswap switch <profile> [--distill] [--stay]`,
+Usage: lodestone switch <profile> [--distill] [--stay]`,
 
-    status: `warmswap status — show profile burn and session status
+    status: `lodestone status — show profile burn and session status
 
-Usage: warmswap status [--json]`,
+Usage: lodestone status [--json]`,
 
-    doctor: `warmswap doctor — diagnose setup issues
+    doctor: `lodestone doctor — diagnose setup issues
 
-Usage: warmswap doctor`,
+Usage: lodestone doctor`,
 
-    dash: `warmswap dash — live TUI dashboard
+    dash: `lodestone dash — live TUI dashboard
 
-Usage: warmswap dash [--once]
+Usage: lodestone dash [--once]
 
 Options:
   --once               Render one frame and exit (for testing)`,
 
-    keepalive: `warmswap keepalive — keep session warm with TTL refresh pings
+    keepalive: `lodestone keepalive — keep session warm with TTL refresh pings
 
-Usage: warmswap keepalive <profile> [--for <duration>] [--max-pings <n>]
-       warmswap keepalive --stop [<profile>]
-       warmswap keepalive --status
+Usage: lodestone keepalive <profile> [--for <duration>] [--max-pings <n>]
+       lodestone keepalive --stop [<profile>]
+       lodestone keepalive --status
 
 Options:
   --for <duration>     Duration (e.g. 90m, 2h) — default 90m
@@ -332,9 +332,9 @@ Options:
   --stop [<profile>]   Stop keepalive (all if no profile)
   --status             Show active keepalive schedulers`,
 
-    audit: `warmswap audit — analyze handoff and switch events
+    audit: `lodestone audit — analyze handoff and switch events
 
-Usage: warmswap audit [--since <duration>] [--json]
+Usage: lodestone audit [--since <duration>] [--json]
 
 Options:
   --since <duration>   Look back (e.g. 7d, 24h) — default 7d
@@ -345,7 +345,7 @@ Options:
 }
 
 function printError(message: string): void {
-  stderr.write(`warmswap: ${message}\n`);
+  stderr.write(`lodestone: ${message}\n`);
 }
 
 // Self-execute when run directly (`node dist/cli.js …`), not just via bin shim.

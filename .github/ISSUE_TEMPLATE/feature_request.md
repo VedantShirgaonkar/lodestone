@@ -10,7 +10,7 @@ assignees: ""
 Describe the problem you're trying to solve (what makes the current flow hard?).
 
 ## Proposed solution
-How should warmswap work to solve it?
+How should lodestone work to solve it?
 
 ## Alternatives considered
 Any other approaches you've thought about?

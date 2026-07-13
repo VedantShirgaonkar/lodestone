@@ -10,7 +10,7 @@ interface CommandOptions {
 }
 
 /**
- * warmswap trail — enable/disable/check trail mode for a project
+ * lodestone trail — enable/disable/check trail mode for a project
  *
  * trail on|off|status
  */
@@ -25,7 +25,7 @@ export async function trail(args: string[], opts: CommandOptions): Promise<numbe
     const subcommand = positionals[0];
 
     if (!subcommand) {
-      stderr.write("warmswap trail: usage: trail on|off|status\n");
+      stderr.write("lodestone trail: usage: trail on|off|status\n");
       return 2;
     }
 
@@ -39,12 +39,12 @@ export async function trail(args: string[], opts: CommandOptions): Promise<numbe
     } else if (subcommand === "status") {
       return await trailStatus(projectRoot, opts);
     } else {
-      stderr.write("warmswap trail: unknown subcommand. usage: trail on|off|status\n");
+      stderr.write("lodestone trail: unknown subcommand. usage: trail on|off|status\n");
       return 2;
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap trail: ${message}\n`);
+    stderr.write(`lodestone trail: ${message}\n`);
     return 1;
   }
 }
@@ -60,7 +60,7 @@ async function trailOn(projectRoot: string, opts: CommandOptions): Promise<numbe
 
     // Write rules file. This text is read by CLAUDE at session start — it
     // must command the agent directly, unprompted, with unambiguous triggers.
-    const rulesContent = `# Session trail (warmswap)
+    const rulesContent = `# Session trail (lodestone)
 
 You maintain \`.claude/handoff/trail.md\` throughout this session, without being asked. It is the session's survival record: if this session ends abruptly (usage limit, crash, closed terminal), the next session continues from that file alone. Write it for a successor who knows nothing you haven't written down.
 
@@ -129,7 +129,7 @@ Keep the total under 1.5k tokens. Never include secrets or credentials.
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap trail on: ${message}\n`);
+    stderr.write(`lodestone trail on: ${message}\n`);
     return 1;
   }
 }
@@ -169,7 +169,7 @@ async function trailOff(projectRoot: string, opts: CommandOptions): Promise<numb
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap trail off: ${message}\n`);
+    stderr.write(`lodestone trail off: ${message}\n`);
     return 1;
   }
 }
@@ -222,7 +222,7 @@ async function trailStatus(projectRoot: string, opts: CommandOptions): Promise<n
     return 0;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    stderr.write(`warmswap trail status: ${message}\n`);
+    stderr.write(`lodestone trail status: ${message}\n`);
     return 1;
   }
 }

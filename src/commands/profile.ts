@@ -15,7 +15,7 @@ export async function profile(
   _opts: CommandOptions
 ): Promise<number> {
   if (args.length === 0) {
-    console.error("warmswap profile: missing subcommand (add|list|remove|rename)");
+    console.error("lodestone profile: missing subcommand (add|list|remove|rename)");
     return 2;
   }
 
@@ -32,14 +32,14 @@ export async function profile(
     case "rename":
       return await profileRename(subArgs);
     default:
-      console.error(`warmswap profile: unknown subcommand: ${subcommand}`);
+      console.error(`lodestone profile: unknown subcommand: ${subcommand}`);
       return 2;
   }
 }
 
 async function profileAdd(args: string[]): Promise<number> {
   if (args.length === 0 || !args[0]) {
-    console.error("warmswap profile add: missing name");
+    console.error("lodestone profile add: missing name");
     return 2;
   }
 
@@ -47,7 +47,7 @@ async function profileAdd(args: string[]): Promise<number> {
 
   try {
     if (name.includes("/") || name.includes("\\") || name.includes(":")) {
-      console.error(`warmswap profile add: invalid name: ${name}`);
+      console.error(`lodestone profile add: invalid name: ${name}`);
       return 1;
     }
 
@@ -56,11 +56,11 @@ async function profileAdd(args: string[]): Promise<number> {
     addProfile(name, { configDir: profileDir });
 
     console.log(`profile added: ${name}`);
-    console.log(`to authenticate: warmswap ${name} /login`);
+    console.log(`to authenticate: lodestone ${name} /login`);
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap profile add: ${msg}`);
+    console.error(`lodestone profile add: ${msg}`);
     return 1;
   }
 }
@@ -123,14 +123,14 @@ async function profileList(): Promise<number> {
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap profile list: ${msg}`);
+    console.error(`lodestone profile list: ${msg}`);
     return 1;
   }
 }
 
 async function profileRemove(args: string[]): Promise<number> {
   if (args.length === 0 || !args[0]) {
-    console.error("warmswap profile remove: missing name");
+    console.error("lodestone profile remove: missing name");
     return 2;
   }
 
@@ -140,7 +140,7 @@ async function profileRemove(args: string[]): Promise<number> {
     const config = loadConfig();
 
     if (!config.profiles[name]) {
-      console.error(`warmswap profile remove: profile not found: ${name}`);
+      console.error(`lodestone profile remove: profile not found: ${name}`);
       return 1;
     }
 
@@ -151,14 +151,14 @@ async function profileRemove(args: string[]): Promise<number> {
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap profile remove: ${msg}`);
+    console.error(`lodestone profile remove: ${msg}`);
     return 1;
   }
 }
 
 async function profileRename(args: string[]): Promise<number> {
   if (args.length < 2 || !args[0] || !args[1]) {
-    console.error("warmswap profile rename: missing old or new name");
+    console.error("lodestone profile rename: missing old or new name");
     return 2;
   }
 
@@ -169,12 +169,12 @@ async function profileRename(args: string[]): Promise<number> {
     const config = loadConfig();
 
     if (!config.profiles[oldName]) {
-      console.error(`warmswap profile rename: profile not found: ${oldName}`);
+      console.error(`lodestone profile rename: profile not found: ${oldName}`);
       return 1;
     }
 
     if (newName.includes("/") || newName.includes("\\") || newName.includes(":")) {
-      console.error(`warmswap profile rename: invalid name: ${newName}`);
+      console.error(`lodestone profile rename: invalid name: ${newName}`);
       return 1;
     }
 
@@ -187,7 +187,7 @@ async function profileRename(args: string[]): Promise<number> {
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap profile rename: ${msg}`);
+    console.error(`lodestone profile rename: ${msg}`);
     return 1;
   }
 }

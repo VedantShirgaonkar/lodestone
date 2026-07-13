@@ -27,8 +27,8 @@ test("loadRegistry: missing file returns empty list", () => {
  * Test: loadRegistry with valid config.json
  */
 test("loadRegistry: parses valid config.json", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
-  const configDir = join(tmpDir, "warmswap");
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  const configDir = join(tmpDir, "lodestone");
   mkdirSync(configDir, { recursive: true });
 
   const configPath = join(configDir, "config.json");
@@ -68,7 +68,7 @@ test("loadRegistry: parses valid config.json", () => {
  * Test: loadProfileQuota with missing usage-cache.json
  */
 test("loadProfileQuota: missing cache file returns 'none'", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   const result = loadProfileQuota(tmpDir);
   assert.strictEqual(result.source, "none");
   assert.strictEqual(result.stale, false);
@@ -78,11 +78,11 @@ test("loadProfileQuota: missing cache file returns 'none'", () => {
  * Test: loadProfileQuota with fresh cache (live data)
  */
 test("loadProfileQuota: parses fresh usage-cache.json", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
-  const warmswapDir = join(tmpDir, "warmswap");
-  mkdirSync(warmswapDir, { recursive: true });
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  const lodestoneDir = join(tmpDir, "lodestone");
+  mkdirSync(lodestoneDir, { recursive: true });
 
-  const cacheFile = join(warmswapDir, "usage-cache.json");
+  const cacheFile = join(lodestoneDir, "usage-cache.json");
   const cache = {
     fetchedAt: Date.now(),
     source: "statusline",
@@ -111,11 +111,11 @@ test("loadProfileQuota: parses fresh usage-cache.json", () => {
  * Test: loadProfileQuota with stale cache (>10min old)
  */
 test("loadProfileQuota: marks cache >10min old as stale", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
-  const warmswapDir = join(tmpDir, "warmswap");
-  mkdirSync(warmswapDir, { recursive: true });
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  const lodestoneDir = join(tmpDir, "lodestone");
+  mkdirSync(lodestoneDir, { recursive: true });
 
-  const cacheFile = join(warmswapDir, "usage-cache.json");
+  const cacheFile = join(lodestoneDir, "usage-cache.json");
   const cache = {
     fetchedAt: Date.now() - 11 * 60 * 1000, // 11 minutes ago
     source: "statusline",
@@ -134,7 +134,7 @@ test("loadProfileQuota: marks cache >10min old as stale", () => {
  * Test: cacheWarmth with no transcripts returns 'cold'
  */
 test("cacheWarmth: no transcripts returns cold", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   const projectDir = "/Users/test/myproject";
 
   const result = cacheWarmth(tmpDir, projectDir);
@@ -146,7 +146,7 @@ test("cacheWarmth: no transcripts returns cold", () => {
  * Test: cacheWarmth with fresh transcript
  */
 test("cacheWarmth: fresh transcript shows minutes remaining", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   const projectDir = "/Users/test/myproject";
 
   // Munge the path
@@ -171,7 +171,7 @@ test("cacheWarmth: fresh transcript shows minutes remaining", () => {
  * Test: cacheWarmth with /private prefix (macOS)
  */
 test("cacheWarmth: falls back to /private-prefixed variant", () => {
-  const tmpDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   const projectDir = "/Users/test/myproject";
 
   // Create munged path with /private prefix
@@ -200,7 +200,7 @@ test("buildStatusText: no profiles shows warning", () => {
   };
 
   const text = buildStatusText(model);
-  assert.ok(text.includes("warmswap"));
+  assert.ok(text.includes("lodestone"));
   assert.ok(text.includes("no profiles"));
 });
 

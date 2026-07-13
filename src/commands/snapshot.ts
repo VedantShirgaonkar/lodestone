@@ -46,10 +46,10 @@ export async function snapshot(
     const profileInfo = resolveActingProfile(opts.profile);
     if (!profileInfo) {
       if (opts.profile) {
-        console.error(`warmswap snapshot: profile not found: ${opts.profile}`);
+        console.error(`lodestone snapshot: profile not found: ${opts.profile}`);
       } else {
         console.error(
-          `warmswap snapshot: no profiles registered — run: warmswap profile add <name>`
+          `lodestone snapshot: no profiles registered — run: lodestone profile add <name>`
         );
       }
       return 1;
@@ -65,7 +65,7 @@ export async function snapshot(
       sessionPath = findSessionById(configDir, process.cwd(), sessionId);
       if (!sessionPath) {
         console.error(
-          `warmswap snapshot: no session found for this project on profile ${profileInfo.name}`
+          `lodestone snapshot: no session found for this project on profile ${profileInfo.name}`
         );
         return 1;
       }
@@ -73,7 +73,7 @@ export async function snapshot(
       sessionPath = latestSession(configDir, process.cwd());
       if (!sessionPath) {
         console.error(
-          `warmswap snapshot: no session found for this project on profile ${profileInfo.name}`
+          `lodestone snapshot: no session found for this project on profile ${profileInfo.name}`
         );
         return 1;
       }
@@ -145,7 +145,7 @@ export async function snapshot(
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`warmswap snapshot: ${msg}`);
+    console.error(`lodestone snapshot: ${msg}`);
     return 1;
   }
 }

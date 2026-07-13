@@ -55,14 +55,14 @@ export interface StatusModel {
 }
 
 /**
- * Load the warmswap registry (config.json) with XDG_CONFIG_HOME support.
+ * Load the lodestone registry (config.json) with XDG_CONFIG_HOME support.
  * Returns profiles list and settings, tolerant of absence.
  */
 export function loadRegistry(env?: NodeJS.ProcessEnv): RegistryData {
   const actualEnv = env ?? process.env;
   const configHome =
     actualEnv.XDG_CONFIG_HOME || join(homedir(), ".config");
-  const configPath = join(configHome, "warmswap", "config.json");
+  const configPath = join(configHome, "lodestone", "config.json");
 
   if (!existsSync(configPath)) {
     return { profiles: [], settings: {} };
@@ -99,7 +99,7 @@ export function loadRegistry(env?: NodeJS.ProcessEnv): RegistryData {
  * Returns stale flag (>10min old) and labeled source.
  */
 export function loadProfileQuota(configDir: string): ProfileQuotaData {
-  const cacheFile = join(configDir, "warmswap", "usage-cache.json");
+  const cacheFile = join(configDir, "lodestone", "usage-cache.json");
 
   if (!existsSync(cacheFile)) {
     return { source: "none", stale: false };
@@ -240,7 +240,7 @@ export function cacheWarmth(
  */
 export function buildStatusText(model: StatusModel): string {
   if (model.profiles.size === 0) {
-    return "$(warning) warmswap: no profiles";
+    return "$(warning) lodestone: no profiles";
   }
 
   const advisorThresholds = model.advisorThresholds;
@@ -280,7 +280,7 @@ export function buildStatusText(model: StatusModel): string {
   }
 
   if (!worstProfile) {
-    return "$(warning) warmswap: no data";
+    return "$(warning) lodestone: no data";
   }
 
   const [name, quota] = worstProfile;

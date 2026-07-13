@@ -10,8 +10,8 @@ import { fileURLToPath } from "node:url";
 // Statusline reads stdin, so it must be exercised as a real child process:
 // in-process calls would listen on the test runner's never-ending stdin.
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
-const CLI = resolve(__testDir, "../..", "bin/warmswap.js");
-const testDir = resolve(tmpdir(), `warmswap-test-statusline-${Date.now()}`);
+const CLI = resolve(__testDir, "../..", "bin/lodestone.js");
+const testDir = resolve(tmpdir(), `lodestone-test-statusline-${Date.now()}`);
 
 function runStatusline(
   stdinText: string,
@@ -40,10 +40,10 @@ function runStatusline(
 test("statusline: renders profile and context from valid input", async () => {
   const testHome = resolve(testDir, "home1");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -100,10 +100,10 @@ test("statusline: exits 0 with empty stdin", async () => {
 test("statusline v2: renders rate_limits with real data", async () => {
   const testHome = resolve(testDir, "home-v2-1");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -139,10 +139,10 @@ test("statusline v2: renders rate_limits with real data", async () => {
 test("statusline v2: writes usage cache from rate_limits", async () => {
   const testHome = resolve(testDir, "home-v2-2");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -167,7 +167,7 @@ test("statusline v2: writes usage cache from rate_limits", async () => {
 
   // Check that cache was written
   const { readFileSync } = await import("node:fs");
-  const cachePath = resolve(testHome, ".config/warmswap/usage-cache.json");
+  const cachePath = resolve(testHome, ".config/lodestone/usage-cache.json");
   if (existsSync(cachePath)) {
     const cache = JSON.parse(readFileSync(cachePath, "utf8"));
     assert.equal(cache.source, "statusline");
@@ -180,10 +180,10 @@ test("statusline v2: writes usage cache from rate_limits", async () => {
 test("statusline v2: shows advisor glyph at 5h threshold", async () => {
   const testHome = resolve(testDir, "home-v2-3");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -218,10 +218,10 @@ test("statusline v2: shows advisor glyph at 5h threshold", async () => {
 test("statusline v2: shows pacing marker when high utilization", async () => {
   const testHome = resolve(testDir, "home-v2-4");
   const configDir = resolve(testHome, ".claude");
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -261,12 +261,12 @@ test("statusline: cache segment with fresh session mtime", async () => {
   const mungedCwd = workspaceCwd.split("/").join("-");
   const projectPath = resolve(projectsDir, mungedCwd);
 
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await mkdir(projectPath, { recursive: true });
 
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -311,12 +311,12 @@ test("statusline: cache segment shows cold when session is old", async () => {
   const mungedCwd = workspaceCwd.split("/").join("-");
   const projectPath = resolve(projectsDir, mungedCwd);
 
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
   await mkdir(projectPath, { recursive: true });
 
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },
@@ -353,11 +353,11 @@ test("statusline: omits cache segment when no session exists", async () => {
   const testHome = resolve(testDir, "home-cache-none");
   const configDir = resolve(testHome, ".claude");
 
-  await mkdir(resolve(testHome, ".config/warmswap"), { recursive: true });
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
   await mkdir(configDir, { recursive: true });
 
   await writeFile(
-    resolve(testHome, ".config/warmswap/config.json"),
+    resolve(testHome, ".config/lodestone/config.json"),
     JSON.stringify({
       schema: 1,
       profiles: { personal: { configDir } },

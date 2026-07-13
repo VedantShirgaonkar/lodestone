@@ -189,7 +189,7 @@ async function hookSessionStart(input: unknown): Promise<number> {
         hookEventName: "SessionStart",
         additionalContext,
       },
-      systemMessage: `warmswap: restored handoff (~${tokens} tokens, from ${meta.sourceProfile || "unknown"}, ${ageStr})`,
+      systemMessage: `lodestone: restored handoff (~${tokens} tokens, from ${meta.sourceProfile || "unknown"}, ${ageStr})`,
     };
 
     stdout.write(JSON.stringify(output) + "\n");
@@ -344,7 +344,7 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
     // Only when trail mode is installed for this project.
     try {
       const projectRoot = findProjectRoot(cwd);
-      const rulesPath = join(projectRoot, ".claude", "rules", "warmswap-trail.md");
+      const rulesPath = join(projectRoot, ".claude", "rules", "lodestone-trail.md");
       if (existsSync(rulesPath)) {
         const staleMinutes = config.settings.advisor?.trailStaleMinutes ?? 20;
         const trailPath = join(projectRoot, ".claude", "handoff", "trail.md");
@@ -419,9 +419,9 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
           });
         }
         messages.push(
-          `warmswap: ${warningWindow} window at ${warningUtilization}% — snapshot saved. ` +
+          `lodestone: ${warningWindow} window at ${warningUtilization}% — snapshot saved. ` +
             `If the limit hits: after reset, start a fresh session here and it loads automatically. ` +
-            `Cross-account: warmswap switch <profile>.`
+            `Cross-account: lodestone switch <profile>.`
         );
         contexts.push(
           "(A recovery snapshot was just saved. Claude may suggest /handoff for a higher-quality handoff while the session is still alive.)"
@@ -430,9 +430,9 @@ async function hookUserPromptSubmit(input: unknown): Promise<number> {
         advisorState[warningWindow] = currentBucket;
         stateChanged = true;
         messages.push(
-          `warmswap: ${warningWindow} window at ${warningUtilization}% — cache is warm. ` +
+          `lodestone: ${warningWindow} window at ${warningUtilization}% — cache is warm. ` +
             `Shedding bloat in place? use /compact (native). Crossing a boundary? /handoff then ` +
-            `warmswap switch <profile> or /clear to refresh here.`
+            `lodestone switch <profile> or /clear to refresh here.`
         );
         contexts.push(
           "(Claude may suggest running /handoff to write a high-quality handoff while cache is warm — for a same-account context refresh via /clear, or before switching accounts.)"
@@ -546,7 +546,7 @@ function writeAdvisorState(
  */
 async function hookSelfTest(): Promise<number> {
   try {
-    const tempDir = `/tmp/warmswap-hook-test-${Date.now()}`;
+    const tempDir = `/tmp/lodestone-hook-test-${Date.now()}`;
     mkdirSync(tempDir, { recursive: true });
 
     // Create synthetic handoff

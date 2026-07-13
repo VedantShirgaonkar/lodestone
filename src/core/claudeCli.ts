@@ -8,7 +8,7 @@ import type { ProfileInfo } from "./profiles.js";
  * Returns the path if found, or "claude" (will fail at runtime if not available).
  */
 export function claudePath(): string {
-  const envOverride = process.env.WARMSWAP_CLAUDE_BIN;
+  const envOverride = process.env.LODESTONE_CLAUDE_BIN;
   if (envOverride) {
     return envOverride;
   }

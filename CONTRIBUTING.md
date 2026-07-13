@@ -1,4 +1,4 @@
-# Contributing to warmswap
+# Contributing to lodestone
 
 Thank you for your interest in contributing! This document covers development setup, testing expectations, and the design philosophy behind the codebase.
 
@@ -20,8 +20,8 @@ Thank you for your interest in contributing! This document covers development se
 
 ### Install & build
 ```bash
-git clone https://github.com/TODO(owner)/warmswap
-cd warmswap
+git clone https://github.com/TODO(owner)/lodestone
+cd lodestone
 npm ci                # clean install
 npm run build         # tsc to dist/
 npm test              # run all tests
@@ -32,7 +32,7 @@ npm test              # run all tests
 bin/                  CLI entry point
 src/
   cli.ts              main dispatch
-  commands/           warmswap subcommands (profile, switch, status, etc.)
+  commands/           lodestone subcommands (profile, switch, status, etc.)
   core/               business logic (profiles, transcripts, usage, handoff extraction)
   util/               helpers (logging, ANSI colors, paths, JSONL parsing)
 test/
@@ -81,7 +81,7 @@ import { mkdtempSync } from "node:fs";
 import { spawn } from "node:child_process";
 
 test("switch command orchestrates handoff", async (t) => {
-  const tempCfgDir = mkdtempSync(join(tmpdir(), "warmswap-test-"));
+  const tempCfgDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
   // Set up fake profiles in tempCfgDir
   // Run: CLAUDE_CONFIG_DIR=tempCfgDir node dist/cli.js switch work
   // Assert output and side effects
@@ -89,7 +89,7 @@ test("switch command orchestrates handoff", async (t) => {
 ```
 
 ### Child-process stdin rule
-When spawning Claude (`launcher`, `distill`, etc.) in tests, use `WARMSWAP_CLAUDE_BIN=test/fake-claude.sh` env var (or mock via `claudeCli` injectable I/O). Never actually run `claude` in tests unless explicitly validating real-world behavior.
+When spawning Claude (`launcher`, `distill`, etc.) in tests, use `LODESTONE_CLAUDE_BIN=test/fake-claude.sh` env var (or mock via `claudeCli` injectable I/O). Never actually run `claude` in tests unless explicitly validating real-world behavior.
 
 `test/fake-claude.sh` can be environment-scripted (e.g., `FAKE_CLAUDE_EXIT=0 FAKE_CLAUDE_OUTPUT="..."`) for controlled responses.
 
@@ -128,7 +128,7 @@ fs.writeFileSync(outputPath, markdown);
 
 ### Error handling
 - Commands: catch, log, return exit code (1 error, 2 usage)
-- Hooks: always exit 0, log errors to warmswap.log (never print to stderr in a hook context)
+- Hooks: always exit 0, log errors to lodestone.log (never print to stderr in a hook context)
 - Core logic: throw on programming errors; return Result type (or maybe-null) for user-facing failures
 - JSONL parsing: never throw on malformed lines; yield `{ error: "...", lineNo: N }`
 
@@ -169,25 +169,25 @@ The `scripts/smoke-real.mjs` script and Phase 7's `measure-switch.ts` protocol a
 
 If you're testing a fix against real data:
 ```bash
-warmswap doctor                      # sanity check your setup
-warmswap status                      # see live metrics
-warmswap profile list                # verify profiles
+lodestone doctor                      # sanity check your setup
+lodestone status                      # see live metrics
+lodestone profile list                # verify profiles
 # Now test the specific command
-warmswap switch work --stay          # example test command
+lodestone switch work --stay          # example test command
 ```
 
 ## Performance & resource use
 
-- **Startup**: `warmswap --version` should respond <100ms
-- **Hooks**: <2s (hard limit; monitor via `warmswap.log`)
+- **Startup**: `lodestone --version` should respond <100ms
+- **Hooks**: <2s (hard limit; monitor via `lodestone.log`)
 - **CLI commands**: <5s for status/audit (network wait may apply if fetching real usage)
 - **Dashboard refresh**: 2s (configurable)
 - **Log rotation**: 1MB max, one backup (2MB total on disk)
 
 Profile with:
 ```bash
-time warmswap status                # wall-clock time
-strace -c node bin/warmswap.js ...  # syscall breakdown (Linux)
+time lodestone status                # wall-clock time
+strace -c node bin/lodestone.js ...  # syscall breakdown (Linux)
 ```
 
 ## Feature checklist
@@ -204,7 +204,7 @@ Before proposing a major feature:
 ## Reporting bugs
 
 Include:
-- `warmswap doctor` output
+- `lodestone doctor` output
 - `claude --version` output
 - Your OS and Node version
 - Exact steps to reproduce
