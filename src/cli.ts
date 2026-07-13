@@ -1,5 +1,7 @@
 import { stderr } from "node:process";
-import { pathToFileURL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { pathToFileURL, fileURLToPath } from "node:url";
 import { profile } from "./commands/profile.js";
 import { launch } from "./commands/launch.js";
 import { login } from "./commands/login.js";
@@ -19,7 +21,31 @@ import { trail } from "./commands/trail.js";
 import { refresh } from "./commands/refresh.js";
 import { setup } from "./commands/setup.js";
 
-const VERSION = "0.1.0";
+/**
+ * Read the version from package.json rather than repeating it here. The
+ * hardcoded constant silently drifted: 0.2.0 shipped announcing itself as
+ * 0.1.0. Walk up from the compiled file so this works from dist/ and from the
+ * test build alike.
+ */
+const VERSION = ((): string => {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 6; i++) {
+    const candidate = join(dir, "package.json");
+    if (existsSync(candidate)) {
+      try {
+        const pkg = JSON.parse(readFileSync(candidate, "utf8")) as {
+          name?: string;
+          version?: string;
+        };
+        if (pkg.name === "lodestone-cli" && pkg.version) return pkg.version;
+      } catch {
+        // keep walking
+      }
+    }
+    dir = dirname(dir);
+  }
+  return "unknown";
+})();
 
 const COMMAND_NAMES = new Set([
   "profile",

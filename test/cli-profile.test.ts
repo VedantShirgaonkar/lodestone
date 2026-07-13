@@ -433,3 +433,20 @@ test("cli: switch shows nothing to hand off when no session", async () => {
     await rm(resolve(testDir, "switch2"), { recursive: true, force: true });
   }
 });
+
+test("cli: --version matches package.json", async () => {
+  // 0.2.0 shipped to npm announcing itself as 0.1.0, because the version was
+  // typed into cli.ts by hand and drifted.
+  const pkg = JSON.parse(
+    await readFile(resolve(__testDir, "../..", "package.json"), "utf8")
+  );
+  let output = "";
+  const oldLog = console.log;
+  console.log = (msg: string) => { output += msg + "\n"; };
+  try {
+    await main(["--version"]);
+  } finally {
+    console.log = oldLog;
+  }
+  assert.match(output, new RegExp(`lodestone ${pkg.version.replace(/\./g, "\\.")}`));
+});
