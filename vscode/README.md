@@ -9,7 +9,7 @@ A lightweight VS Code extension that bridges lodestone's account-switching and q
 **Click the status bar** for a menu:
 - **Handoff & Switch Account…** Pick a profile and run the account switch with handoff
 - **Keep Current Account Warm…** Keep your current session cache alive while switching
-- **Open Dashboard (terminal)** View account details and transaction history
+- **Open Dashboard (terminal)** Live quota bars, cache countdowns, and switch-cost view for all profiles
 - **Refresh Status** Manually refresh quota display
 - **Enable real usage data** Opt in to live quota from Anthropic's API (requires credentials)
 

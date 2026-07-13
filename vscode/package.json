@@ -63,5 +63,17 @@
     "@types/node": "^22.0.0",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.5.0"
-  }
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "anthropic",
+    "usage",
+    "quota",
+    "rate-limit",
+    "prompt-cache",
+    "handoff",
+    "account-switching",
+    "statusline"
+  ]
 }
