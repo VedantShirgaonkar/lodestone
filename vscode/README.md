@@ -42,5 +42,5 @@ _(Placeholder: status bar item with quota text; tooltip popover; QuickPick menu)
 
 ## Links
 
-- [lodestone repository](https://github.com/your-org/lodestone)
+- [lodestone repository](https://github.com/VedantShirgaonkar/lodestone)
 - [CLI documentation](../docs/OVERVIEW.md)
