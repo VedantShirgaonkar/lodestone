@@ -6,3 +6,6 @@ dist-test/
 *.tgz
 .claude/settings.local.json
 .claude/handoff/
+
+# Third-party reference material: never commit
+references/
