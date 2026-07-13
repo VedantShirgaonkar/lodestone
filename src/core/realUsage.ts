@@ -32,7 +32,13 @@ export interface QuotaResult {
   sevenDayUtilization?: number | undefined;
   sevenDayResetsAt?: number | undefined;
   hasPacing?: boolean | undefined;
+  /** How old the figures are. 0 = fetched just now. Surfaces as "(3m ago)". */
+  ageSeconds?: number | undefined;
 }
+
+/** A quota climbing during heavy work goes visibly wrong within minutes. */
+const FRESH_MS = 90 * 1000;         // bridge this new is as good as live
+const USABLE_MS = 15 * 60 * 1000;   // older than this, prefer an estimate
 
 /**
  * Cache bridge path for statusline-driven real data
@@ -51,7 +57,10 @@ export function advisorStatePath(configDir: string): string {
 /**
  * Read usage cache if fresh (<10min old)
  */
-export function readUsageCache(configDir: string): UsageCacheData | undefined {
+export function readUsageCache(
+  configDir: string,
+  maxAgeMs: number = USABLE_MS
+): UsageCacheData | undefined {
   const cachePath = usageCachePath(configDir);
   if (!existsSync(cachePath)) {
     return undefined;
@@ -60,13 +69,9 @@ export function readUsageCache(configDir: string): UsageCacheData | undefined {
   try {
     const raw = readFileSync(cachePath, "utf8");
     const data = JSON.parse(raw) as UsageCacheData;
-
-    // Check freshness: <10min old
-    const ageMs = Date.now() - data.fetchedAt;
-    if (ageMs > 10 * 60 * 1000) {
+    if (Date.now() - data.fetchedAt > maxAgeMs) {
       return undefined;
     }
-
     return data;
   } catch {
     return undefined;
@@ -220,20 +225,26 @@ export async function getQuota(
   isRealUsageOptedIn: boolean,
   fetchImpl?: typeof global.fetch
 ): Promise<QuotaResult> {
-  // Try bridge first (from statusline, always fresh if present)
-  const bridgeData = readUsageCache(configDir);
-  if (bridgeData) {
-    return {
-      source: "statusline",
-      fiveHourUtilization: bridgeData.five_hour?.used_percentage,
-      fiveHourResetsAt: bridgeData.five_hour?.resets_at_ts,
-      sevenDayUtilization: bridgeData.seven_day?.used_percentage,
-      sevenDayResetsAt: bridgeData.seven_day?.resets_at_ts,
-      hasPacing: true,
-    };
+  const asBridge = (data: UsageCacheData): QuotaResult => ({
+    source: "statusline",
+    fiveHourUtilization: data.five_hour?.used_percentage,
+    fiveHourResetsAt: data.five_hour?.resets_at_ts,
+    sevenDayUtilization: data.seven_day?.used_percentage,
+    sevenDayResetsAt: data.seven_day?.resets_at_ts,
+    hasPacing: true,
+    ageSeconds: Math.max(0, Math.round((Date.now() - data.fetchedAt) / 1000)),
+  });
+
+  // 1. A bridge entry written seconds ago (a live statusline render) is as
+  //    good as a fresh fetch, and costs nothing.
+  const fresh = readUsageCache(configDir, FRESH_MS);
+  if (fresh) {
+    return asBridge(fresh);
   }
 
-  // Try OAuth if opted in
+  // 2. Otherwise fetch the truth if the user opted in. This is the path that
+  //    keeps figures current inside VS Code, where Claude Code runs no
+  //    statusline and therefore never refreshes the bridge.
   if (isRealUsageOptedIn) {
     const oauthData = await fetchOAuthQuota(configDir, claudeVersion, fetchImpl);
     if (oauthData) {
@@ -250,11 +261,19 @@ export async function getQuota(
         sevenDayResetsAt: oauthData.seven_day?.resets_at
           ? new Date(oauthData.seven_day.resets_at).getTime() / 1000
           : undefined,
+        ageSeconds: 0,
       };
     }
   }
 
-  // Fallback: estimate (caller provides this)
+  // 3. No live fetch available: a somewhat older bridge entry still beats a
+  //    guess, but it is labeled with its age so nobody reads it as current.
+  const stale = readUsageCache(configDir, USABLE_MS);
+  if (stale) {
+    return asBridge(stale);
+  }
+
+  // 4. Nothing real to show.
   return {
     source: "estimate",
   };

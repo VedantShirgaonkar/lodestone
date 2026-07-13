@@ -7,6 +7,7 @@ import { resolveActingProfile } from "../core/profiles.js";
 import { windowBurn } from "../core/usage.js";
 import { loadConfig } from "../core/config.js";
 import { writeUsageCache } from "../core/realUsage.js";
+import { quotaBar, dim } from "../util/ansi.js";
 
 interface RateLimitsSegment {
   used_percentage?: number;
@@ -63,6 +64,13 @@ function planBudgetTokens(planName?: string): number {
   if (lower.includes("max5")) return 1000000;
   if (lower.includes("team")) return 2000000;
   return 200000; // pro default
+}
+
+/** 1_573_574 -> "1.6M" */
+function fmtTok(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
 }
 
 export async function statusline(): Promise<number> {
@@ -130,25 +138,23 @@ export async function statusline(): Promise<number> {
       // 5h segment with pacing
       const fiveHourPct = typedInput.rate_limits.five_hour?.used_percentage;
       if (fiveHourPct !== undefined) {
-        // Calculate pacing target: elapsed / window_length
-        // For now, show if we're above target (>50% at 2.5h = 50% of window)
-        const isPacing =
-          fiveHourPct > 50 ? "▲" + Math.min(fiveHourPct, 99) : "";
-        fiveHourStr = ` · 5h ${fiveHourPct}%${isPacing}`;
-
-        // Show countdown to reset if present
+        // Pacing: where linear consumption *should* be right now, derived from
+        // how much of the 5h window has elapsed. Burning ahead of it earns a ▲.
+        let pacing = "";
+        let countdown = "";
         if (typedInput.rate_limits.five_hour?.resets_at) {
           const resetEpoch = typedInput.rate_limits.five_hour.resets_at;
           const nowEpoch = Math.floor(Date.now() / 1000);
-          const minutesRemaining = Math.max(
-            0,
-            Math.round((resetEpoch - nowEpoch) / 60)
-          );
+          const secsLeft = Math.max(0, resetEpoch - nowEpoch);
+          const WINDOW = 5 * 3600;
+          const target = Math.round(((WINDOW - secsLeft) / WINDOW) * 100);
+          if (fiveHourPct > target + 5) pacing = dim(` ▲${target}`);
+          const minutesRemaining = Math.round(secsLeft / 60);
           if (minutesRemaining > 0 && minutesRemaining < 300) {
-            // Only show if <5h
-            fiveHourStr += ` (${formatDuration(minutesRemaining * 60)})`;
+            countdown = dim(` ${formatDuration(minutesRemaining * 60)}`);
           }
         }
+        fiveHourStr = ` · 5h ${quotaBar(fiveHourPct)} ${fiveHourPct}%${pacing}${countdown}`;
 
         // Advisor glyph: warn at threshold
         const config = loadConfig();
@@ -161,7 +167,7 @@ export async function statusline(): Promise<number> {
       // 7d segment
       const weeklyPct = typedInput.rate_limits.seven_day?.used_percentage;
       if (weeklyPct !== undefined) {
-        weeklyStr = ` · wk ${weeklyPct}%`;
+        weeklyStr = ` · wk ${quotaBar(weeklyPct)} ${weeklyPct}%`;
 
         // Check weekly threshold for advisor
         if (!advisorGlyph) {
@@ -198,11 +204,13 @@ export async function statusline(): Promise<number> {
       try {
         const parsed = await parseSession(typedInput.transcript_path);
         const contextTokens = latestContextTokens(parsed);
-        const config = loadConfig();
-        const plan = config.settings.plan ?? "pro";
-        const budget = planBudgetTokens(plan);
-        const taxPct = calculateSwitchTaxPercent(contextTokens, budget);
-        switchTaxStr = ` · switch ≈${taxPct}%`;
+        if (contextTokens > 0) {
+          // What a boundary costs, in the only unit we can state honestly:
+          // weighted tokens. A percentage here would be a percentage of a plan
+          // budget we are guessing at, which is how "switch 792%" happened.
+          const naive = contextTokens * 2;
+          switchTaxStr = ` · ${dim("switch")} ${fmtTok(naive)}${dim("→")}${fmtTok(45000)}`;
+        }
       } catch {
         // Silent fail, omit switch segment
       }

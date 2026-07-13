@@ -47,3 +47,17 @@ export function progressBar(
   const bar = "█".repeat(filled) + "░".repeat(empty);
   return `[${bar}] ${Math.round(pct)}%`;
 }
+
+/**
+ * A compact quota bar for one-line surfaces: solid blocks, colored by
+ * severity (green under half, amber past half, red at the advisor line).
+ * Honors NO_COLOR through the shared colorize helpers.
+ */
+export function quotaBar(pct: number, width: number = 8): string {
+  const p = Math.max(0, Math.min(100, pct));
+  const filled = Math.round((p / 100) * width);
+  const bar = "█".repeat(filled) + "░".repeat(Math.max(0, width - filled));
+  if (p >= 85) return red(bar);
+  if (p >= 50) return yellow(bar);
+  return green(bar);
+}

@@ -34,7 +34,7 @@ test("realUsage: writes and reads usage cache", async () => {
   rmSync(testDir, { recursive: true });
 });
 
-test("realUsage: cache expires after 10 minutes", async () => {
+test("realUsage: cache expires past the usable window", async () => {
   const configDir = join(testDir, "config2");
   mkdirSync(configDir, { recursive: true });
 
@@ -44,7 +44,7 @@ test("realUsage: cache expires after 10 minutes", async () => {
   mkdirSync(cacheDir, { recursive: true });
 
   const staleData = {
-    fetchedAt: Date.now() - 11 * 60 * 1000, // 11 minutes ago
+    fetchedAt: Date.now() - 16 * 60 * 1000, // 11 minutes ago
     source: "statusline" as const,
     five_hour: { used_percentage: 50 },
   };
