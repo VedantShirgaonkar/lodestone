@@ -151,8 +151,18 @@ export async function parseSession(path: string): Promise<ParsedSession> {
   let lastTs: string | undefined = undefined;
 
   if (finalLines.length > 0) {
-    lastTs = finalLines[finalLines.length - 1]?.timestamp;
-    firstTs = finalLines[0]?.timestamp;
+    // Not every line is timestamped: a transcript commonly opens with an
+    // `ai-title` line and closes with a `summary` or `file-history-snapshot`,
+    // none of which carry one. Taking the literal ends leaves firstTs/lastTs
+    // undefined, which silently defeats every staleness check downstream (dash
+    // shows month-old sessions as live, audit cannot measure a session gap).
+    // Take the outermost lines that actually carry a time.
+    for (let i = finalLines.length - 1; i >= 0 && !lastTs; i--) {
+      lastTs = finalLines[i]?.timestamp;
+    }
+    for (let i = 0; i < finalLines.length && !firstTs; i++) {
+      firstTs = finalLines[i]?.timestamp;
+    }
 
     // Scan backward for fields
     for (let i = finalLines.length - 1; i >= 0; i--) {
@@ -361,17 +371,12 @@ function extractUserContent(msg: unknown): string {
 }
 
 /**
- * Find the latest session for a project in a config directory.
- * Returns the path to the newest .jsonl file under projects/<munged-cwd>/
+ * Newest .jsonl inside an already-resolved project directory (that is, a
+ * `projects/<munged>/` folder). Callers that are walking `projects/` already
+ * hold this path; munging it a second time would produce a directory that does
+ * not exist.
  */
-export function latestSession(
-  configDir: string,
-  cwd: string
-): string | undefined {
-  const munged = mungeCwd(cwd);
-  const projectsDir = projectsDirFor(configDir);
-  const projectDir = join(projectsDir, munged);
-
+export function newestSessionIn(projectDir: string): string | undefined {
   if (!existsSync(projectDir)) {
     return undefined;
   }
@@ -380,15 +385,13 @@ export function latestSession(
   let latestMtime = 0;
 
   try {
-    const files = readdirSync(projectDir);
-    for (const file of files) {
-      if (file.endsWith(".jsonl")) {
-        const filePath = join(projectDir, file);
-        const stat = statSync(filePath);
-        if (stat.mtime.getTime() > latestMtime) {
-          latestMtime = stat.mtime.getTime();
-          latestFile = filePath;
-        }
+    for (const file of readdirSync(projectDir)) {
+      if (!file.endsWith(".jsonl")) continue;
+      const filePath = join(projectDir, file);
+      const mtime = statSync(filePath).mtime.getTime();
+      if (mtime > latestMtime) {
+        latestMtime = mtime;
+        latestFile = filePath;
       }
     }
   } catch {
@@ -396,6 +399,17 @@ export function latestSession(
   }
 
   return latestFile;
+}
+
+/**
+ * Find the latest session for a working directory in a config directory.
+ * Returns the path to the newest .jsonl file under projects/<munged-cwd>/
+ */
+export function latestSession(
+  configDir: string,
+  cwd: string
+): string | undefined {
+  return newestSessionIn(join(projectsDirFor(configDir), mungeCwd(cwd)));
 }
 
 /**

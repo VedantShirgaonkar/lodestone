@@ -175,3 +175,56 @@ test("settingsEdit: installHooks double-install proves idempotence", () => {
   assert.equal(firstHookCount, secondHookCount);
   assert.deepEqual(firstParse, secondParse);
 });
+
+test("settingsEdit: install never duplicates, and repairs existing duplicates", () => {
+  // Older versions keyed "is this already installed?" on the literal substring
+  // "lodestone hook". Any command that did not contain it (an absolute path, a
+  // dev build, LODESTONE_HOOK_CMD) was never recognized, so every run appended
+  // another identical hook. One real settings.json reached 369 copies, each one
+  // firing on every session event.
+  const dir = join(testDir, "dupes");
+  mkdirSync(dir, { recursive: true });
+  const settingsPath = join(dir, "settings.json");
+
+  // A file already carrying five copies of our hook, plus a hook we do not own.
+  writeFileSync(
+    settingsPath,
+    JSON.stringify({
+      hooks: {
+        SessionStart: [
+          ...Array.from({ length: 5 }, () => ({
+            hooks: [{ type: "command", command: "lodestone hook session-start" }],
+          })),
+          { hooks: [{ type: "command", command: "some-other-tool --init" }] },
+        ],
+      },
+    }),
+    "utf8"
+  );
+
+  const countOf = (event: string, pred: (c: string) => boolean): number => {
+    const s = JSON.parse(readFileSync(settingsPath, "utf8"));
+    const entries = s.hooks?.[event] ?? [];
+    let n = 0;
+    for (const e of entries) {
+      for (const h of e.hooks ?? []) {
+        if (typeof h.command === "string" && pred(h.command)) n++;
+      }
+    }
+    return n;
+  };
+
+  installHooks(settingsPath, { sessionStartCmd: "lodestone hook session-start" });
+
+  assert.equal(countOf("SessionStart", (c) => c.includes("lodestone hook")), 1,
+    "five duplicates collapsed to one");
+  assert.equal(countOf("SessionStart", (c) => c === "some-other-tool --init"), 1,
+    "a hook we do not own is left alone");
+
+  // And installing repeatedly stays at one, whatever the command looks like.
+  for (let i = 0; i < 3; i++) {
+    installHooks(settingsPath, { sessionStartCmd: "/opt/bin/lodestone hook session-start" });
+  }
+  assert.equal(countOf("SessionStart", (c) => c.includes("lodestone hook")), 1,
+    "a relocated binary updates in place, it does not accumulate");
+});

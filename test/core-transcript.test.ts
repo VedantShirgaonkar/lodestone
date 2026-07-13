@@ -93,3 +93,18 @@ test("transcript: contextTokensOf handles undefined", () => {
   const tokens = contextTokensOf(undefined);
   assert.equal(tokens, 0);
 });
+
+test("transcript: timestamps survive untimed first and last lines", async () => {
+  // Real transcripts open with an `ai-title` line and close with a
+  // `file-history-snapshot` or `summary`, none of which carry a timestamp.
+  // Reading the literal ends left firstTs/lastTs undefined, and every staleness
+  // check downstream fails open on that: dash listed month-old sessions as
+  // live, and audit's gap detector skipped the pair entirely.
+  const parsed = await parseSession(
+    join(fixturesDir, "session-untimed-ends.jsonl")
+  );
+
+  assert.equal(parsed.meta.firstTs, "2026-07-13T09:00:00.000Z");
+  assert.equal(parsed.meta.lastTs, "2026-07-13T09:05:00.000Z");
+  assert.equal(parsed.meta.cwd, "/work/proj", "cwd is how we find the handoffs");
+});

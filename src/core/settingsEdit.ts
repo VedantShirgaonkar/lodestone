@@ -15,9 +15,11 @@ export interface SettingsConfig {
 
 /**
  * Install hooks into a settings.json file.
- * Idempotent: detects existing hooks by command substring ("lodestone hook <type>").
- * If our subcommand exists but the full command differs, UPDATES it in place.
- * Backs up to settings.json.bak before writing.
+ *
+ * Idempotent, and self-repairing: an exact copy of the command we are about to
+ * install is never added twice, a stale hook of ours is updated in place rather
+ * than duplicated, and pre-existing duplicates left by older versions are
+ * collapsed. Backs up to settings.json.bak before writing.
  * Throws on invalid JSON or write error.
  */
 export function installHooks(
@@ -189,75 +191,117 @@ function isSettingsPath(path: string): boolean {
   return path.endsWith("settings.json") || path.endsWith("settings.local.json");
 }
 
+/** Every command hook registered under one event, with a way to rewrite it. */
+function* hookCommandsOf(
+  existing: unknown
+): Generator<{ cmd: string; set: (h: SettingsHook) => void }> {
+  if (!Array.isArray(existing)) return;
+  for (const entry of existing) {
+    if (typeof entry !== "object" || entry === null || !("hooks" in entry)) {
+      continue;
+    }
+    const innerHooks = (entry as Record<string, unknown>).hooks;
+    if (!Array.isArray(innerHooks)) continue;
+    for (let i = 0; i < innerHooks.length; i++) {
+      const ih = innerHooks[i];
+      if (
+        typeof ih === "object" &&
+        ih !== null &&
+        typeof (ih as Record<string, unknown>).command === "string"
+      ) {
+        const idx = i;
+        yield {
+          cmd: (ih as Record<string, unknown>).command as string,
+          set: (h: SettingsHook) => {
+            innerHooks[idx] = h;
+          },
+        };
+      }
+    }
+  }
+}
+
 /**
- * Helper: create or update hook in hooksObj.
- * Idempotent by command substring matching.
- * If our lodestone hook subcommand exists but the full command differs, UPDATE it in place.
- * Returns {changed: boolean}.
+ * Drop repeated copies of a hook we own, keeping one. Older versions
+ * appended instead of updating whenever the installed command did not contain
+ * the marker substring, so a settings file can already carry many copies of the
+ * same hook, each firing on every event. Running `init` should repair that, not
+ * merely decline to make it worse. Only touches commands we recognize as ours.
  */
+function dedupeOurHooks(existing: unknown, command: string): boolean {
+  if (!Array.isArray(existing)) return false;
+
+  const seen = new Set<string>();
+  let removed = 0;
+
+  for (let i = existing.length - 1; i >= 0; i--) {
+    const entry = existing[i];
+    if (typeof entry !== "object" || entry === null || !("hooks" in entry)) {
+      continue;
+    }
+    const inner = (entry as Record<string, unknown>).hooks;
+    if (!Array.isArray(inner)) continue;
+
+    const kept = inner.filter((h) => {
+      const cmd = (h as { command?: unknown }).command;
+      if (typeof cmd !== "string") return true;
+      const ours = cmd === command || cmd.includes("lodestone hook");
+      if (!ours) return true;
+      if (seen.has(cmd)) {
+        removed++;
+        return false;
+      }
+      seen.add(cmd);
+      return true;
+    });
+
+    if (kept.length === 0) {
+      existing.splice(i, 1);
+    } else if (kept.length !== inner.length) {
+      (entry as Record<string, unknown>).hooks = kept;
+    }
+  }
+
+  return removed > 0;
+}
+
 function createOrUpdateHook(
   command: string,
   eventName: string,
   hooksObj: Record<string, unknown>,
   matcher?: string
 ): { changed: boolean } {
-  // Check if this command subcommand already exists
   const existing = hooksObj[eventName];
-  if (Array.isArray(existing)) {
-    for (let entryIdx = 0; entryIdx < existing.length; entryIdx++) {
-      const entry = existing[entryIdx];
-      if (typeof entry === "object" && entry !== null && "hooks" in entry) {
-        const innerHooks = (entry as Record<string, unknown>).hooks;
-        if (Array.isArray(innerHooks)) {
-          for (let hookIdx = 0; hookIdx < innerHooks.length; hookIdx++) {
-            const ih = innerHooks[hookIdx];
-            if (
-              typeof ih === "object" &&
-              ih !== null &&
-              "command" in ih &&
-              typeof (ih as Record<string, unknown>).command === "string"
-            ) {
-              const existingCmd = (ih as Record<string, unknown>)
-                .command as string;
-              // Detect if this is our hook by lodestone hook substring
-              if (existingCmd.includes("lodestone hook")) {
-                // Check if it's the same command
-                if (existingCmd === command) {
-                  return { changed: false }; // Already present, no change needed
-                }
-                // Different command with same subcommand → UPDATE in place
-                const newHook: SettingsHook = {
-                  type: "command",
-                  command,
-                  timeout: 30,
-                };
-                if (matcher) {
-                  newHook.matcher = matcher;
-                }
-                innerHooks[hookIdx] = newHook;
-                return { changed: true };
-              }
-            }
-          }
-        }
-      }
-    }
-  }
+  const repaired = dedupeOurHooks(existing, command);
 
-  // Not found → add new hook
-  const newHook: SettingsHook = {
-    type: "command",
-    command,
-    timeout: 30,
-  };
+  const newHook: SettingsHook = { type: "command", command, timeout: 30 };
   if (matcher) {
     newHook.matcher = matcher;
   }
 
-  const hookEntry = {
-    hooks: [newHook],
-  };
+  // Is this exact command already registered? Check this first, and for ANY
+  // hook rather than only ones we recognize as ours. The ownership marker below
+  // is a substring of the default command, so a caller that installs under a
+  // different command (an absolute path, `node dist/cli.js`, LODESTONE_HOOK_CMD
+  // in a dev build) was never recognized as already-installed, and every run
+  // appended another identical copy. That is how a settings file ends up with a
+  // hundred of the same hook, each one firing on every event.
+  for (const { cmd } of hookCommandsOf(existing)) {
+    if (cmd === command) {
+      return { changed: repaired };
+    }
+  }
 
+  // Ours, but stale (the binary moved, or the command changed): update in place
+  // rather than adding a second one.
+  for (const hook of hookCommandsOf(existing)) {
+    if (hook.cmd.includes("lodestone hook")) {
+      hook.set(newHook);
+      return { changed: true };
+    }
+  }
+
+  const hookEntry = { hooks: [newHook] };
   if (Array.isArray(existing)) {
     existing.push(hookEntry);
   } else {

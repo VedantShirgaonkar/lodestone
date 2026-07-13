@@ -1,0 +1,4 @@
+{"type":"ai-title","title":"synthetic session"}
+{"type":"user","cwd":"/work/proj","sessionId":"sess-untimed","gitBranch":"main","version":"2.1.0","timestamp":"2026-07-13T09:00:00.000Z","message":{"role":"user","content":"start"}}
+{"type":"assistant","sessionId":"sess-untimed","timestamp":"2026-07-13T09:05:00.000Z","message":{"id":"msg_1","role":"assistant","model":"claude-fable-5","content":[{"type":"text","text":"done"}],"usage":{"input_tokens":10,"cache_creation_input_tokens":0,"cache_read_input_tokens":1000,"output_tokens":5}}}
+{"type":"file-history-snapshot","messageId":"msg_1","snapshot":{}}

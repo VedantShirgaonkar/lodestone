@@ -208,18 +208,31 @@ test("audit: classifies refresh when same profile with <5h gap", async () => {
   const testHome = resolve(testDir, "home7");
   const configDir = resolve(testHome, ".claude");
   const projectDir = resolve(configDir, "projects/-test-proj");
-  const handoffDir = resolve(projectDir, ".claude/handoff");
+  // Handoffs live in the project's working directory. The transcript's `cwd` is
+  // what points there, and it is the only reliable way back: the munged project
+  // name is lossy. A fixture that puts handoffs under projects/<munged>/ is
+  // testing a path that exists on no real machine.
+  const projectRoot = resolve(testHome, "work/proj");
+  const handoffDir = resolve(projectRoot, ".claude/handoff");
   const now = Date.now();
   const sourceSessionMtimeMs = now - 3 * 60 * 60 * 1000; // 3 hours ago
   const consumedAtMs = sourceSessionMtimeMs + 2 * 60 * 60 * 1000; // 2 hours later
 
   await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
-  await mkdir(configDir, { recursive: true });
+  await mkdir(projectDir, { recursive: true });
   await mkdir(handoffDir, { recursive: true });
 
   // Create a session file with the appropriate mtime
   const sessionFile = resolve(projectDir, "session.jsonl");
-  await writeFile(sessionFile, '{"type":"user"}\n');
+  await writeFile(
+    sessionFile,
+    JSON.stringify({
+      type: "user",
+      cwd: projectRoot,
+      sessionId: "session123",
+      message: { role: "user", content: "go" },
+    }) + "\n"
+  );
 
   // Set the mtime to 3 hours ago
   const sourceSessionMtime = new Date(sourceSessionMtimeMs);
@@ -272,18 +285,27 @@ test("audit: classifies post-reset when same profile with ≥5h gap", async () =
   const testHome = resolve(testDir, "home8");
   const configDir = resolve(testHome, ".claude");
   const projectDir = resolve(configDir, "projects/-test-proj");
-  const handoffDir = resolve(projectDir, ".claude/handoff");
+  const projectRoot = resolve(testHome, "work/proj");
+  const handoffDir = resolve(projectRoot, ".claude/handoff");
   const now = Date.now();
   const sourceSessionMtimeMs = now - 7 * 60 * 60 * 1000; // 7 hours ago
   const consumedAtMs = sourceSessionMtimeMs + 6 * 60 * 60 * 1000; // 6 hours later
 
   await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
-  await mkdir(configDir, { recursive: true });
+  await mkdir(projectDir, { recursive: true });
   await mkdir(handoffDir, { recursive: true });
 
   // Create a session file with the appropriate mtime
   const sessionFile = resolve(projectDir, "session.jsonl");
-  await writeFile(sessionFile, '{"type":"user"}\n');
+  await writeFile(
+    sessionFile,
+    JSON.stringify({
+      type: "user",
+      cwd: projectRoot,
+      sessionId: "session125",
+      message: { role: "user", content: "go" },
+    }) + "\n"
+  );
 
   // Set the mtime to 7 hours ago
   const sourceSessionMtime = new Date(sourceSessionMtimeMs);

@@ -138,12 +138,39 @@ distilled: ${snapshot.distilled}
   return { markdown, meta };
 }
 
+/** Archive basename for a handoff, derived from when it was created. The
+ *  markdown and its meta share the stem, so they rotate as one unit. */
+function archiveStem(created: string): string {
+  return created.replace(/[:.]/g, "-");
+}
+
+/**
+ * Write a handoff's meta into the archive, beside its markdown. This is the
+ * durable record: `latest.meta.json` is overwritten by the next handoff, so a
+ * consumption record that lives only there dies within a session, taking the
+ * evidence of what the boundary cost with it.
+ */
+function archiveMeta(handoffDir: string, meta: HandoffMeta): void {
+  if (!meta.created) return;
+  try {
+    const archiveDir = join(handoffDir, "archive");
+    mkdirSync(archiveDir, { recursive: true });
+    writeFileSync(
+      join(archiveDir, `${archiveStem(meta.created)}.meta.json`),
+      JSON.stringify(meta, null, 2),
+      "utf8"
+    );
+  } catch {
+    // Bookkeeping must never fail the operation it is recording.
+  }
+}
+
 /**
  * Save a handoff to disk and archive older versions.
  * Writes to <projectRoot>/.claude/handoff/latest.md
  * and <projectRoot>/.claude/handoff/latest.meta.json
- * Archives to <projectRoot>/.claude/handoff/archive/<timestamp>.md
- * Keeps 20 most recent archives.
+ * Archives both to <projectRoot>/.claude/handoff/archive/<timestamp>.{md,meta.json}
+ * Keeps 20 most recent handoffs.
  */
 export function saveHandoff(
   projectRoot: string,
@@ -158,38 +185,97 @@ export function saveHandoff(
   mkdirSync(autoDir, { recursive: true });
   mkdirSync(archiveDir, { recursive: true });
 
-  // Save latest
   const latestPath = join(handoffDir, "latest.md");
   const metaPath = join(handoffDir, "latest.meta.json");
+
+  // The outgoing handoff's meta holds whether it was consumed, and by whom.
+  // Flush it to the archive before overwriting, or `audit` can never see more
+  // than the single most recent crossing.
+  if (existsSync(metaPath)) {
+    try {
+      const outgoing = JSON.parse(
+        readFileSync(metaPath, "utf8")
+      ) as HandoffMeta;
+      archiveMeta(handoffDir, outgoing);
+    } catch {
+      // A corrupt outgoing record must not block the new handoff.
+    }
+  }
 
   writeFileSync(latestPath, markdown, "utf8");
   writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
 
-  // Archive
-  const archiveName = `${meta.created.replace(/[:.]/g, "-")}.md`;
-  const archivePath = join(archiveDir, archiveName);
-  writeFileSync(archivePath, markdown, "utf8");
+  // Archive the new handoff under its own stem: markdown and meta together.
+  writeFileSync(
+    join(archiveDir, `${archiveStem(meta.created)}.md`),
+    markdown,
+    "utf8"
+  );
+  archiveMeta(handoffDir, meta);
 
-  // Rotate: keep 20 most recent
+  // Rotate: keep the 20 most recent, dropping each markdown with its meta.
   try {
-    const files = readdirSync(archiveDir)
+    const stems = readdirSync(archiveDir)
       .filter((f) => f.endsWith(".md"))
       .map((f) => ({
-        name: f,
+        stem: f.slice(0, -".md".length),
         mtime: statSync(join(archiveDir, f)).mtime.getTime(),
       }))
       .sort((a, b) => b.mtime - a.mtime);
 
-    for (let i = 20; i < files.length; i++) {
-      const file = files[i];
-      if (file) {
-        const obsolete = join(archiveDir, file.name);
-        unlinkSync(obsolete);
+    for (const obsolete of stems.slice(20)) {
+      for (const ext of [".md", ".meta.json"]) {
+        const path = join(archiveDir, obsolete.stem + ext);
+        if (existsSync(path)) unlinkSync(path);
       }
     }
   } catch {
     // Silent fail on rotation
   }
+}
+
+/**
+ * Every durable handoff record for a project: the live one, the archive, and
+ * the automatic snapshots, newest first. `audit` reads this to report what each
+ * boundary actually cost.
+ */
+export function allHandoffMetas(projectRoot: string): HandoffMeta[] {
+  const handoffDir = handoffDirFor(projectRoot);
+  if (!existsSync(handoffDir)) return [];
+
+  const paths: string[] = [join(handoffDir, "latest.meta.json")];
+  for (const sub of ["archive", "auto"]) {
+    const dir = join(handoffDir, sub);
+    if (!existsSync(dir)) continue;
+    try {
+      for (const file of readdirSync(dir)) {
+        if (file.endsWith(".meta.json")) paths.push(join(dir, file));
+      }
+    } catch {
+      // Unreadable directory: nothing to report from it.
+    }
+  }
+
+  const byCreated = new Map<string, HandoffMeta>();
+  for (const path of paths) {
+    if (!existsSync(path)) continue;
+    try {
+      const meta = JSON.parse(readFileSync(path, "utf8")) as HandoffMeta;
+      if (!meta?.created) continue;
+      // The live meta and its archived twin are one handoff. Keep whichever
+      // knows it was consumed: that is the copy with the evidence.
+      const seen = byCreated.get(meta.created);
+      if (!seen || (meta.consumed && !seen.consumed)) {
+        byCreated.set(meta.created, meta);
+      }
+    } catch {
+      // Skip unreadable records rather than failing the whole audit.
+    }
+  }
+
+  return [...byCreated.values()].sort((a, b) =>
+    a.created < b.created ? 1 : -1
+  );
 }
 
 /**
@@ -241,6 +327,8 @@ export function markConsumed(
       at: new Date().toISOString(),
     };
     writeFileSync(metaPath, JSON.stringify(meta, null, 2), "utf8");
+    // Record the crossing where it will survive the next handoff.
+    archiveMeta(handoffDir, meta);
   } catch {
     // Silent fail
   }

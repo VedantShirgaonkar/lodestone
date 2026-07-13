@@ -6,6 +6,8 @@ import {
   loadLatestHandoff,
   markConsumed,
   estimateTokens,
+  allHandoffMetas,
+  type HandoffMeta,
 } from "../src/core/handoffFile.js";
 import { mkdirSync, rmSync, existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -149,10 +151,19 @@ test("handoffFile: archive rotation keeps 20 files", () => {
     saveHandoff(projectRoot, markdown, meta);
   }
 
-  // Check archive directory has at most 20 files
+  // At most 20 handoffs are kept, and each keeps its meta: the markdown and the
+  // record of what it cost rotate together, or audit outlives its evidence.
   const archiveDir = join(projectRoot, ".claude", "handoff", "archive");
   const files = readdirSync(archiveDir);
-  assert.ok(files.length <= 20);
+  const markdowns = files.filter((f) => f.endsWith(".md"));
+  const metas = files.filter((f) => f.endsWith(".meta.json"));
+
+  assert.ok(markdowns.length <= 20, "keeps at most 20 handoffs");
+  assert.equal(metas.length, markdowns.length, "every kept handoff kept its meta");
+  for (const md of markdowns) {
+    const stem = md.slice(0, -".md".length);
+    assert.ok(files.includes(`${stem}.meta.json`), `${stem} rotated as a pair`);
+  }
 });
 
 test("handoffFile: trail consume-once with revival on newer update", async () => {
@@ -210,4 +221,44 @@ test("handoffFile: consumed autos are skipped, older unconsumed wins", async () 
 
   markAutoConsumed(root, older, "personal", "sess-B");
   assert.equal(freshest(root), undefined, "all consumed -> nothing injects");
+});
+
+test("handoffFile: a consumption record survives the next handoff", () => {
+  // The bug this pins: saveHandoff archived the markdown but overwrote
+  // latest.meta.json with a fresh consumed:false record. The only evidence that
+  // a boundary was ever crossed lived in that file, so every handoff destroyed
+  // the measurement of the one before it and `audit` could never report more
+  // than the most recent crossing.
+  const root = join(testDir, "durable");
+  mkdirSync(join(root, ".claude"), { recursive: true });
+
+  const meta = (created: string, session: string): HandoffMeta => ({
+    schema: 1,
+    created,
+    sourceProfile: "personal",
+    sourceSession: session,
+    project: "-test-durable",
+    contextTokens: 150_000,
+    distilled: false,
+    consumed: false,
+  });
+
+  const first = meta("2026-07-13T10:00:00.000Z", "sess-1");
+  saveHandoff(root, "# Handoff\nfirst\n", first);
+  markConsumed(root, "work", "sess-2");
+
+  // A second handoff, which used to wipe the record above.
+  saveHandoff(root, "# Handoff\nsecond\n", meta("2026-07-13T11:00:00.000Z", "sess-3"));
+
+  const metas = allHandoffMetas(root);
+  const recovered = metas.find((m) => m.created === "2026-07-13T10:00:00.000Z");
+  assert.ok(recovered, "the first handoff is still on the record");
+  assert.equal(recovered.consumed, true, "and still known to have been consumed");
+  assert.equal(recovered.consumedBy?.profile, "work", "by the account that picked it up");
+
+  const live = metas.find((m) => m.created === "2026-07-13T11:00:00.000Z");
+  assert.ok(live, "the current handoff is there too");
+  assert.equal(live.consumed, false, "and is correctly still unconsumed");
+
+  assert.equal(metas.length, 2, "two handoffs, counted once each");
 });

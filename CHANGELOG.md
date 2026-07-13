@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-07-13
+
+**`audit` and `dash` were reporting nothing. Both are fixed, and the cause was the same in each.**
+
+### Fixed
+
+- **`audit` never reported a single event.** Three defects, stacked:
+  1. It looked for handoffs under `~/.claude/projects/<munged>/.claude/handoff/`, a path that exists on no machine. Handoffs live in the project's working directory (ADR-005). It now takes the real project root from the transcript's `cwd` field, which is the only reliable route: the munged name cannot be reversed, because a directory called `my-app` and a nested `my/app` munge identically, and a space becomes a dash.
+  2. Its session scan called `latestSession(configDir, projectPath)`, but that function takes a *working directory* and munges it. Passing an already-munged path munged it twice, so the scan resolved to nothing and both detectors ran on an empty map.
+  3. It reported one event per profile pair, not one per crossing, so even a working detector could only ever have shown you the first.
+- **Consumption records were destroyed by the next handoff.** `saveHandoff` archived the markdown but overwrote `latest.meta.json`, which is where the record of who consumed a handoff, and what the context cost, actually lives. Every new handoff erased the measurement of the one before it. Handoff metas are now archived beside their markdown and rotate with them, so the audit trail outlives the handoff that produced it.
+- **`dash` never listed a live session**, from the same double-munge bug in its project scan.
+- **Session timestamps were often missing.** `parseSession` read `firstTs`/`lastTs` from the literal first and last lines of a transcript, but those are commonly an `ai-title` and a `file-history-snapshot`, neither of which carries a timestamp. Every staleness check downstream then failed open: `dash` would have listed month-old sessions as live, and audit's gap detector skipped the pair. It now takes the outermost lines that actually have a time.
+- **`--since` was ignored** by the explicit detector.
+- **`init` could install the same hook many times over.** The "is this already installed?" check keyed on the literal substring `lodestone hook`, so any command that did not contain it (an absolute path, a local build, anything set via `LODESTONE_HOOK_CMD`) was never recognized as present, and every run appended another identical copy. An exact copy of the command being installed is now never added twice, and `init` collapses duplicates left behind by older versions instead of merely declining to add more. Hooks belonging to other tools are left untouched.
+- **The test suite wrote hooks into the developer's real `~/.claude/settings.json`.** One test called `init` in-process with no environment isolation, so it resolved the real config, found the real profiles, and edited the real settings file on every `npm test`. It asserted nothing beyond "did not throw", so it passed while doing this. It now runs in a child process against a scratch `HOME`, and the suite is verified not to touch the real settings file. A companion test claiming to prove idempotency was a tautology (it read the same file twice and asserted the two reads matched); it now counts hooks.
+
+### Changed
+
+- Repo prepared for public use: internal build documents removed, docs indexed and cross-linked, contributor and security process documented.
+
+## [0.2.0] - 2026-07-13
+
+- Renamed to lodestone. Setup TUI, live quota in the statusline and the editor extension, real-usage endpoint, trail mode. See the git history for the full detail.
+
 ## [0.1.0] - 2026-07-12
 
 **Initial release: Core CLI, profiles, handoffs, advisor, audit, and dashboard.**
@@ -84,7 +109,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **docs/EVALUATION.md**: Methodology for measuring handoff savings; live-protocol section for Phase 7 validation.
 - **docs/explainer/how-claude-code-memory-works.md**: The physics of Claude Code layers, cache TTLs, and switch tax.
 - **docs/research/01**: Prompt caching mechanism, TTL tiers, org/workspace isolation (verified, final verdict).
-- **docs/research/06**: Real usage data sources, advisor mechanics, UI strategy, cache keepalive.
+- **docs/research/04**: Real usage data sources, advisor mechanics, UI strategy, cache keepalive.
 - **docs/decisions/ADR-001 through ADR-010**: Decision records on handoff strategy, profiles, deps, features, quality ladder, usage data, keepalive, UI surfaces.
 
 #### Testing

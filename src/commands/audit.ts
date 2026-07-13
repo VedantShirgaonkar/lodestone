@@ -6,11 +6,15 @@ import { loadConfig } from "../core/config.js";
 import { expandTilde, projectsDirFor } from "../core/paths.js";
 import {
   parseSession,
-  latestSession,
+  newestSessionIn,
   latestContextTokens,
   type ParsedSession,
 } from "../core/transcript.js";
-import { loadLatestHandoff, estimateTokens } from "../core/handoffFile.js";
+import {
+  loadLatestHandoff,
+  estimateTokens,
+  allHandoffMetas,
+} from "../core/handoffFile.js";
 
 interface CommandOptions {
   json: boolean;
@@ -135,7 +139,10 @@ async function detectEvents(
         const projectPath = join(projectsDir, projectMunged);
         if (!statSync(projectPath).isDirectory()) continue;
 
-        const sessionPath = latestSession(configDir, projectPath);
+        // projectPath is already a projects/<munged>/ directory. Munging it
+        // again (which latestSession does) resolves to nothing, which is why
+        // this map used to come back empty and no detector ever fired.
+        const sessionPath = newestSessionIn(projectPath);
         if (!sessionPath) continue;
 
         try {
@@ -153,104 +160,86 @@ async function detectEvents(
     }
   }
 
-  // Detector A: Explicit handoff records (via meta.json consumedBy)
-  const seenHandoffPairs = new Set<string>();
-  for (const [profileName, profileCfg] of Object.entries(config.profiles)) {
-    const configDir = expandTilde(
-      (profileCfg as Record<string, unknown>).configDir as string
-    );
+  // Detector A: explicit handoff records (meta.json consumedBy).
+  //
+  // Handoffs live in the project's working directory, not under
+  // ~/.claude/projects/<munged>/, and the munged name cannot be reversed: a
+  // project at ~/code/my-app munges identically to a nested ~/code/my/app. The
+  // transcript carries the true cwd, so take the project root from there.
+  const projectRoots = new Map<string, string>(); // munged -> real project root
+  for (const projects of Object.values(sessionsByProfileProject)) {
+    for (const [projectMunged, entry] of Object.entries(projects)) {
+      const cwd = entry?.meta?.cwd as string | undefined;
+      if (cwd && !projectRoots.has(projectMunged)) {
+        projectRoots.set(projectMunged, cwd);
+      }
+    }
+  }
 
-    try {
-      const projectsDir = projectsDirFor(configDir);
-      if (!existsSync(projectsDir)) continue;
+  const seenHandoffs = new Set<string>();
+  // Pairs with a real record. Detector B guesses at boundaries from session
+  // timing, so it must stay quiet wherever we already have hard evidence.
+  const explicitPairs = new Set<string>();
+  for (const [projectMunged, projectRoot] of projectRoots) {
+    for (const meta of allHandoffMetas(projectRoot)) {
+      if (!meta.consumed || !meta.consumedBy?.profile || !meta.sourceProfile) {
+        continue;
+      }
 
-      const projects = readdirSync(projectsDir);
-      for (const projectMunged of projects) {
-        const projectPath = join(projectsDir, projectMunged);
-        if (!statSync(projectPath).isDirectory()) continue;
+      const sourceProfile = meta.sourceProfile;
+      const targetProfile = meta.consumedBy.profile;
+      const consumedAtStr = meta.consumedBy.at;
 
-        // Look for handoff meta files
-        const handoffDir = join(projectPath, ".claude", "handoff");
-        if (!existsSync(handoffDir)) continue;
+      // One event per handoff consumed, not one per profile pair: "every
+      // boundary you crossed" has to mean every crossing, not the first.
+      const key = `${projectMunged}|${meta.created}|${consumedAtStr ?? ""}`;
+      if (seenHandoffs.has(key)) continue;
+      seenHandoffs.add(key);
 
-        const metaFile = join(handoffDir, "latest.meta.json");
-        if (!existsSync(metaFile)) continue;
+      // An undated record still happened, so keep it; a dated one outside the
+      // window is not part of what was asked for.
+      if (consumedAtStr && new Date(consumedAtStr) < before) continue;
 
-        try {
-          const metaContent = JSON.parse(readFileSync(metaFile, "utf8")) as {
-            consumed?: boolean;
-            consumedBy?: {
-              profile?: string;
-              sessionId?: string;
-              at?: string;
-            };
-            sourceProfile?: string;
-            sourceSession?: string;
-            contextTokens?: number;
-            created?: string;
-          };
-
-          if (
-            metaContent.consumed &&
-            metaContent.consumedBy?.profile &&
-            metaContent.sourceProfile
-          ) {
-            const sourceProfile = metaContent.sourceProfile;
-            const targetProfile = metaContent.consumedBy.profile;
-            const consumedAtStr = metaContent.consumedBy.at;
-
-            // Determine class
-            let eventClass: "switch" | "refresh" | "post-reset" = "switch";
-            if (sourceProfile === targetProfile) {
-              // Same profile: check for post-reset (≥5h gap) or refresh (<5h)
-              if (consumedAtStr) {
-                const sourceLastActivityMtimeMs = getSourceSessionMtime(
-                  config,
-                  sourceProfile,
-                  metaContent.sourceSession,
-                  projectMunged,
-                  metaContent.created
-                );
-                const consumedAtMs = new Date(consumedAtStr).getTime();
-                const gapMs = consumedAtMs - sourceLastActivityMtimeMs;
-                const gapHours = gapMs / (60 * 60 * 1000);
-
-                eventClass = gapHours >= 5 ? "post-reset" : "refresh";
-              } else {
-                eventClass = "refresh";
-              }
-            }
-
-            const pairKey = `${sourceProfile}→${targetProfile}/${projectMunged}`;
-            if (!seenHandoffPairs.has(pairKey)) {
-              seenHandoffPairs.add(pairKey);
-
-              const sourceContextTokens = metaContent.contextTokens || 0;
-              const naiveEstimate = sourceContextTokens * 2;
-              const handoffEstimate =
-                sourceContextTokens + (20000 + sourceContextTokens * 0.5);
-              const savedEstimate = Math.max(0, naiveEstimate - handoffEstimate);
-
-              events.push({
-                type: "explicit",
-                class: eventClass,
-                sourceProfile,
-                targetProfile,
-                project: projectMunged,
-                sourceContextTokens,
-                naiveEstimate,
-                handoffEstimate,
-                savedEstimate,
-                consumedAt: metaContent.consumedBy.at,
-              });
-            }
-          }
-        } catch {
-          // Skip on parse error
+      let eventClass: "switch" | "refresh" | "post-reset" = "switch";
+      if (sourceProfile === targetProfile) {
+        // Same profile: a long gap means the window reset under us, a short one
+        // means the session was deliberately shed.
+        if (consumedAtStr) {
+          const sourceLastActivityMtimeMs = getSourceSessionMtime(
+            config,
+            sourceProfile,
+            meta.sourceSession,
+            projectMunged,
+            meta.created
+          );
+          const gapHours =
+            (new Date(consumedAtStr).getTime() - sourceLastActivityMtimeMs) /
+            (60 * 60 * 1000);
+          eventClass = gapHours >= 5 ? "post-reset" : "refresh";
+        } else {
+          eventClass = "refresh";
         }
       }
-    } catch {
-      // Skip on error
+
+      explicitPairs.add(`${sourceProfile}→${targetProfile}/${projectMunged}`);
+
+      const sourceContextTokens = meta.contextTokens || 0;
+      const naiveEstimate = sourceContextTokens * 2;
+      const handoffEstimate =
+        sourceContextTokens + (20000 + sourceContextTokens * 0.5);
+
+      events.push({
+        type: "explicit",
+        class: eventClass,
+        sourceProfile,
+        targetProfile,
+        project: projectMunged,
+        sourceContextTokens,
+        naiveEstimate,
+        handoffEstimate,
+        savedEstimate: Math.max(0, naiveEstimate - handoffEstimate),
+        consumedAt: consumedAtStr,
+      });
     }
   }
 
@@ -311,8 +300,8 @@ async function detectEvents(
       if (gapMins > 0 && gapMins < 30) {
         // Heuristic match
         const pairKey = `${sessionA.profile}→${sessionB.profile}/${projectMunged}`;
-        if (!seenHandoffPairs.has(pairKey)) {
-          seenHandoffPairs.add(pairKey);
+        if (!explicitPairs.has(pairKey)) {
+          explicitPairs.add(pairKey);
 
           const sourceContextTokens = sessionA.parsed ? latestContextTokens(sessionA.parsed) : 0;
           const naiveEstimate = sourceContextTokens * 2;

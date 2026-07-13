@@ -13,6 +13,7 @@ import { windowBurn, asPctOfWindow, switchTax } from "../core/usage.js";
 import {
   parseSession,
   latestSession,
+  newestSessionIn,
   latestContextTokens,
   type ParsedSession,
 } from "../core/transcript.js";
@@ -314,7 +315,10 @@ async function getRecentSessions(
       const projectPath = join(projectsDir, projectMunged);
       if (!statSync(projectPath).isDirectory()) continue;
 
-      const sessionPath = latestSession(configDir, projectPath);
+      // projectPath is already the projects/<munged>/ directory. latestSession
+      // takes a working directory and munges it, so passing this would munge it
+      // twice and resolve to nothing: the session list would always be empty.
+      const sessionPath = newestSessionIn(projectPath);
       if (!sessionPath) continue;
 
       try {
