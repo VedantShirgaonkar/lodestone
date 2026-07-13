@@ -3,7 +3,7 @@
   "displayName": "Lodestone",
   "description": "Live Claude Code usage and cache monitoring, with one click handoffs and account switching. Companion to the lodestone CLI.",
   "version": "0.1.0",
-  "publisher": "OWNER-TODO",
+  "publisher": "VedantShirgaonkar",
   "icon": "icon.png",
   "galleryBanner": {
     "color": "#161A20",
