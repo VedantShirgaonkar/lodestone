@@ -288,14 +288,14 @@ test("buildTooltipMarkdown: renders complete popover", () => {
 
   const md = buildTooltipMarkdown(model);
   assert.ok(md.includes("personal"));
-  assert.ok(md.includes("5h"));
+  assert.ok(md.includes("5-hour"));
   assert.ok(md.includes("42%"));
   assert.ok(md.includes("live"));
   assert.ok(md.includes("myproject"));
   assert.ok(md.includes("30m"));
-  assert.ok(md.includes("50000"));
-  assert.ok(md.includes("Cache Warmth"));
-  assert.ok(md.includes("Savings"));
+  assert.ok(md.includes("50k tokens"));
+  assert.ok(md.includes("Cache"));
+  assert.ok(md.includes("Saved"));
 });
 
 /**
@@ -318,7 +318,7 @@ test("buildTooltipMarkdown: 'no data' state when source is none", () => {
   };
 
   const md = buildTooltipMarkdown(model);
-  assert.ok(md.includes("No data available"));
+  assert.ok(md.includes("no data"));
 });
 
 /**
@@ -429,10 +429,10 @@ test("buildTooltipMarkdown: shows savings by class breakdown", () => {
 
   const md = buildTooltipMarkdown(model);
   assert.ok(md.includes("Saved"));
-  assert.ok(md.includes("100000"));
-  assert.ok(md.includes("switch 50000"));
-  assert.ok(md.includes("refresh 30000"));
-  assert.ok(md.includes("post-reset 20000"));
+  assert.ok(md.includes("100k tokens")); // Abbreviated format
+  assert.ok(md.includes("switch 1"));     // Count, not saved amount
+  assert.ok(md.includes("refresh 1"));
+  assert.ok(md.includes("post-reset 1"));
 });
 
 /**
@@ -526,4 +526,209 @@ test("expiryToastDecisions: disabled when threshold is 0", () => {
   const decisions = expiryToastDecisions(warmthMap, 0, toasted);
 
   assert.strictEqual(decisions.length, 0);
+});
+
+/**
+ * Test: buildTooltipMarkdown table has correct headers
+ */
+test("buildTooltipMarkdown: table has Window, Usage, Resets headers", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 42,
+          fiveHourResetsAt: Date.now() + 60 * 60 * 1000,
+          sevenDayPct: 25,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  assert.ok(md.includes("| Window | Usage | Resets |"));
+  assert.ok(md.includes("| 5-hour |"));
+  assert.ok(md.includes("| Weekly |"));
+});
+
+/**
+ * Test: buildTooltipMarkdown emoji bar color at <50%
+ */
+test("buildTooltipMarkdown: green emoji (🟩) under 50%", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 42,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  // At 42%, should have filled cells in green (🟩)
+  assert.ok(md.includes("🟩"), "should include green emoji for <50%");
+  assert.ok(!md.includes("🟧"), "should not include orange emoji");
+});
+
+/**
+ * Test: buildTooltipMarkdown emoji bar color at 50-84%
+ */
+test("buildTooltipMarkdown: orange emoji (🟧) at 50-84%", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 70,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  // At 70%, should have filled cells in orange (🟧)
+  assert.ok(md.includes("🟧"), "should include orange emoji for 50-84%");
+  assert.ok(!md.includes("🟩"), "should not include green emoji");
+});
+
+/**
+ * Test: buildTooltipMarkdown emoji bar color at 85%+
+ */
+test("buildTooltipMarkdown: red emoji (🟥) at 85%+", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 90,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  // At 90%, should have filled cells in red (🟥)
+  assert.ok(md.includes("🟥"), "should include red emoji for 85%+");
+  assert.ok(!md.includes("🟧"), "should not include orange emoji");
+});
+
+/**
+ * Test: buildTooltipMarkdown renders live tag
+ */
+test("buildTooltipMarkdown: renders live tag in backticks", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 42,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  assert.ok(md.includes("`live`"), "should render live tag in backticks");
+});
+
+/**
+ * Test: buildTooltipMarkdown renders est tag
+ */
+test("buildTooltipMarkdown: renders est tag in backticks", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "est",
+          fiveHourPct: 42,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  assert.ok(md.includes("`est`"), "should render est tag in backticks");
+});
+
+/**
+ * Test: buildTooltipMarkdown countdown formatting
+ */
+test("buildTooltipMarkdown: formats reset countdown (hours and minutes)", () => {
+  const resetIn2h30m = Date.now() + 2.5 * 60 * 60 * 1000;
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "live",
+          fiveHourPct: 42,
+          fiveHourResetsAt: resetIn2h30m,
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  // Should render as "2h 30m"
+  assert.ok(/2h 3[0-9]m/.test(md), "should format countdown with hours and minutes");
+});
+
+/**
+ * Test: buildTooltipMarkdown shows no data explicitly
+ */
+test("buildTooltipMarkdown: shows no data when source is none", () => {
+  const model: StatusModel = {
+    profiles: new Map([
+      [
+        "personal",
+        {
+          source: "none",
+          stale: false,
+        },
+      ],
+    ]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+
+  const md = buildTooltipMarkdown(model);
+  assert.ok(md.includes("no data"), "should explicitly say no data");
+  assert.ok(!md.includes("0%"), "should not show fake 0%");
 });

@@ -302,96 +302,91 @@ export function buildStatusText(model: StatusModel): string {
 
 /**
  * Build the tooltip markdown for the status bar popover.
- * Shows per-profile quota bars (live/est labeled), reset countdowns,
- * per-project cache-TTL countdowns, savings, and advisor line.
+ * Shows a proper quota panel with table, colored emoji bars, cache warmth,
+ * savings breakdown, advisor line, and action hint.
  */
 export function buildTooltipMarkdown(model: StatusModel): string {
   let lines: string[] = [];
 
-  // Per-profile section
-  if (model.profiles.size > 0) {
-    for (const [name, quota] of model.profiles) {
-      lines.push(`### ${name}`);
+  lines.push("### Lodestone");
+  lines.push("");
 
-      const label = model.profileLabels.get(name);
-      if (label) {
-        lines.push(`**Login:** ${label}`);
+  // Per-profile quota table
+  if (model.profiles.size > 0) {
+    // Check if we have any real data
+    let hasData = false;
+    for (const quota of model.profiles.values()) {
+      if (quota.source !== "none") {
+        hasData = true;
+        break;
       }
+    }
+
+    for (const [name, quota] of model.profiles) {
+      lines.push(`**${name}**`);
+      lines.push("");
 
       if (quota.source === "none") {
-        lines.push("_No data available_");
-      } else {
-        // 5h quota with bar
-        if (quota.fiveHourPct !== undefined) {
-          const bar = quotaBar(quota.fiveHourPct);
-          lines.push(
-            `**5h:** ${bar} ${quota.fiveHourPct}% \`${quota.source}\``
-          );
-          if (quota.fiveHourResetsAt) {
-            const resetIn = formatCountdown(quota.fiveHourResetsAt);
-            lines.push(`Resets in ${resetIn}`);
-          }
-        } else {
-          lines.push(`**5h:** No data \`${quota.source}\``);
-        }
-
+        lines.push("no data");
         lines.push("");
-
-        // 7d quota with bar
-        if (quota.sevenDayPct !== undefined) {
-          const bar = quotaBar(quota.sevenDayPct);
-          lines.push(
-            `**Weekly:** ${bar} ${quota.sevenDayPct}% \`${quota.source}\``
-          );
-          if (quota.sevenDayResetsAt) {
-            const resetIn = formatCountdown(quota.sevenDayResetsAt);
-            lines.push(`Resets in ${resetIn}`);
-          }
-        } else {
-          lines.push(`**Weekly:** No data \`${quota.source}\``);
-        }
+        continue;
       }
 
+      lines.push("| Window | Usage | Resets |");
+      lines.push("| --- | --- | --- |");
+
+      const row = (
+        label: string,
+        pct: number | undefined,
+        resetsAt: number | undefined
+      ) => {
+        if (pct === undefined) {
+          lines.push(`| ${label} | no data | - |`);
+          return;
+        }
+        const tag = quota.stale ? "est" : quota.source;
+        const resets = resetsAt ? formatCountdown(resetsAt) : "-";
+        lines.push(`| ${label} | ${quotaEmojiBar(pct)} ${pct}% \`${tag}\` | ${resets} |`);
+      };
+
+      row("5-hour", quota.fiveHourPct, quota.fiveHourResetsAt);
+      row("Weekly", quota.sevenDayPct, quota.sevenDayResetsAt);
       lines.push("");
     }
   }
 
   // Per-project cache warmth
   if (model.cacheWarmth.size > 0) {
-    lines.push("### Cache Warmth");
     for (const warmth of model.cacheWarmth.values()) {
+      const folderName = basename(warmth.projectDir);
       if (typeof warmth.minutesRemaining === "number") {
-        lines.push(
-          `**${basename(warmth.projectDir)}:** ${warmth.minutesRemaining}m left`
-        );
+        lines.push(`**Cache:** ${folderName}: ${warmth.minutesRemaining}m left`);
       } else {
-        lines.push(`**${basename(warmth.projectDir)}:** cold`);
+        lines.push(`**Cache:** ${folderName}: cold`);
       }
     }
-    lines.push("");
   }
 
   // Savings section from audit
   if (model.auditTotals && model.auditTotals.totalEstimatedSaved > 0) {
-    lines.push("### Savings");
-    const parts = [`**~${model.auditTotals.totalEstimatedSaved}** total`];
+    const savingsLabel = formatTokenCount(model.auditTotals.totalEstimatedSaved);
+    const parts = [savingsLabel];
     if (model.auditTotals.byClass) {
       const classes = [];
       if (model.auditTotals.byClass.switch?.estimatedSaved) {
-        classes.push(`switch ${model.auditTotals.byClass.switch.estimatedSaved}`);
+        classes.push(`switch ${model.auditTotals.byClass.switch.count}`);
       }
       if (model.auditTotals.byClass.refresh?.estimatedSaved) {
-        classes.push(`refresh ${model.auditTotals.byClass.refresh.estimatedSaved}`);
+        classes.push(`refresh ${model.auditTotals.byClass.refresh.count}`);
       }
       if (model.auditTotals.byClass["post-reset"]?.estimatedSaved) {
-        classes.push(`post-reset ${model.auditTotals.byClass["post-reset"].estimatedSaved}`);
+        classes.push(`post-reset ${model.auditTotals.byClass["post-reset"].count}`);
       }
       if (classes.length > 0) {
         parts.push(`(${classes.join(" · ")})`);
       }
     }
-    lines.push(`**Saved:** ${parts.join(" ")}`);
-    lines.push("");
+    lines.push(`**Saved:** ~${parts.join(" ")}`);
   }
 
   // Advisor line if any profile crosses thresholds
@@ -418,11 +413,11 @@ export function buildTooltipMarkdown(model: StatusModel): string {
 
   if (advisoryText) {
     lines.push(advisoryText);
-    lines.push("");
   }
 
   // Footer hint
-  lines.push("_Click for actions: switch, keep warm, dashboard, refresh_");
+  lines.push("");
+  lines.push("_Click for actions_");
 
   return lines.join("\n");
 }
@@ -444,27 +439,62 @@ export function parseAuditTotals(jsonStr: string): AuditTotals {
 }
 
 /**
- * Render a 10-cell unicode quota bar.
+ * Render a 10-cell emoji quota bar with color-coding.
+ * Under 50%: green (🟩)
+ * 50-84%: orange (🟧)
+ * 85%+: red (🟥)
+ * Empty cells: white (⬜)
  */
-function quotaBar(pct: number): string {
-  const cells = Math.min(10, Math.max(0, Math.round((pct / 100) * 10)));
-  const full = "▓".repeat(cells);
-  const empty = "░".repeat(10 - cells);
-  return `${full}${empty}`;
+function quotaEmojiBar(pct: number): string {
+  const filledCells = Math.min(10, Math.max(0, Math.round((pct / 100) * 10)));
+  const emptyCells = 10 - filledCells;
+
+  let filled = "";
+  if (pct < 50) {
+    filled = "🟩".repeat(filledCells);
+  } else if (pct < 85) {
+    filled = "🟧".repeat(filledCells);
+  } else {
+    filled = "🟥".repeat(filledCells);
+  }
+
+  const empty = "⬜".repeat(emptyCells);
+  return `${filled}${empty}`;
+}
+
+/**
+ * Format a token count as a string with abbreviated units (K, M).
+ */
+function formatTokenCount(tokens: number): string {
+  if (tokens >= 1_000_000) {
+    const m = (tokens / 1_000_000).toFixed(1);
+    return `${m}M tokens`;
+  } else if (tokens >= 1_000) {
+    const k = (tokens / 1_000).toFixed(0);
+    return `${k}k tokens`;
+  }
+  return `${tokens} tokens`;
 }
 
 /**
  * Format milliseconds until reset as "Xh Ym" or "Xm".
  */
-function formatCountdown(resetAtMs: number): string {
+function formatCountdown(resetAt: number): string {
+  // rate_limits.resets_at is Unix epoch SECONDS. Reading it as milliseconds
+  // made every countdown clamp to "0m".
+  const resetMs = resetAt < 1e12 ? resetAt * 1000 : resetAt;
   const now = Date.now();
-  const remainingMs = Math.max(0, resetAtMs - now);
+  const remainingMs = Math.max(0, resetMs - now);
 
   const hours = Math.floor(remainingMs / (60 * 60 * 1000));
   const minutes = Math.floor(
     (remainingMs % (60 * 60 * 1000)) / (60 * 1000)
   );
 
+  if (hours >= 24) {
+    const days = Math.floor(hours / 24);
+    return `${days}d ${hours % 24}h`;
+  }
   if (hours > 0) {
     return `${hours}h ${minutes}m`;
   }

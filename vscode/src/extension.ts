@@ -8,9 +8,11 @@ import {
   cacheWarmth,
   buildStatusText,
   buildTooltipMarkdown,
+  parseAuditTotals,
   expiryToastDecisions,
   StatusModel,
 } from "./model.js";
+import { locateCli, runJson, clearCache } from "./cli.js";
 
 let statusBarItem: vscode.StatusBarItem;
 let refreshInterval: NodeJS.Timeout | null = null;
@@ -185,6 +187,14 @@ async function buildStatusModel(): Promise<StatusModel> {
     weeklyPct: registry.settings?.advisor?.weeklyPct ?? 90,
   };
 
+  // Refresh the usage bridge by calling status --json
+  // This forces the CLI to fetch live data when it is stale and realUsage is on
+  try {
+    runJson("status");
+  } catch {
+    // Silent fail
+  }
+
   // Load quota for each profile
   for (const profile of registry.profiles) {
     const quota = loadProfileQuota(profile.configDir);
@@ -219,12 +229,23 @@ async function buildStatusModel(): Promise<StatusModel> {
     }
   }
 
-  // Savings totals come from `lodestone audit` in the terminal. This extension
-  // deliberately spawns no processes, so it does not compute them here.
+  // Load audit totals
+  let auditTotals: { totalEvents: number; totalEstimatedSaved: number } | undefined =
+    undefined;
+  try {
+    const auditJson = runJson("audit");
+    if (auditJson) {
+      auditTotals = parseAuditTotals(auditJson);
+    }
+  } catch {
+    // Silent fail
+  }
+
   return {
     profiles,
     profileLabels,
     cacheWarmth: cacheWarmthMap,
+    auditTotals,
     advisorThresholds,
   };
 }
@@ -253,7 +274,7 @@ async function handleMenu() {
     case "handoff":
       return handleHandoffSwitch();
     case "refresh-in-place":
-      return offerCommand("lodestone refresh");
+      return runInTerminal("lodestone refresh");
     case "trail-toggle":
       return handleTrailToggle();
     case "keepWarm":
@@ -263,7 +284,7 @@ async function handleMenu() {
     case "refresh":
       return updateStatus();
     case "realUsage":
-      return offerCommand("lodestone config set realUsage on");
+      return runInTerminal("lodestone config set realUsage on");
   }
 }
 
@@ -289,22 +310,28 @@ async function handleHandoffSwitch() {
   if (!target) return;
 
   if (!isSafeToken(target.value)) return;
-  await offerCommand(`lodestone switch ${target.value}`);
+  runInTerminal(`lodestone switch ${target.value}`);
 }
 
 /**
  * Handle trail mode toggle: check current state and toggle.
  */
 async function handleTrailToggle() {
-  const picked = await vscode.window.showQuickPick(
-    [
-      { label: "Turn trail mode ON for this project", value: "lodestone trail on" },
-      { label: "Turn trail mode OFF for this project", value: "lodestone trail off" },
-    ],
-    { placeHolder: "Trail mode keeps a running context file as you work" }
-  );
-  if (!picked) return;
-  await offerCommand(picked.value);
+  try {
+    const statusJson = runJson("trail", ["status"]);
+    if (!statusJson) {
+      vscode.window.showErrorMessage("Failed to check trail status");
+      return;
+    }
+
+    const status = JSON.parse(statusJson);
+    const installed = status.installed ?? false;
+
+    const command = installed ? "lodestone trail off" : "lodestone trail on";
+    runInTerminal(command);
+  } catch {
+    vscode.window.showErrorMessage("Failed to toggle trail mode");
+  }
 }
 
 /**
@@ -336,14 +363,14 @@ async function handleKeepWarm() {
   if (!duration || !DURATION_RE.test(duration.trim())) return;
   if (!isSafeToken(picked.value)) return;
 
-  await offerCommand(`lodestone keepalive ${picked.value} --for ${duration.trim()}`);
+  runInTerminal(`lodestone keepalive ${picked.value} --for ${duration.trim()}`);
 }
 
 /**
  * Handle open dashboard.
  */
 async function handleOpenDash() {
-  await offerCommand("lodestone dash");
+  runInTerminal("lodestone dash");
 }
 
 /**
@@ -380,18 +407,13 @@ function isSafeToken(value: string): boolean {
 }
 
 /**
- * Hand the user a ready-to-run command. The extension deliberately does not
- * execute anything itself: it copies the command and shows it, so nothing runs
- * without the user pressing Enter in their own terminal.
+ * Run a command in the integrated terminal (visible to user).
  */
-async function offerCommand(command: string): Promise<void> {
-  await vscode.env.clipboard.writeText(command);
-  vscode.window.showInformationMessage(
-    `Copied to clipboard: ${command}`,
-    "Open Terminal"
-  ).then((choice) => {
-    if (choice === "Open Terminal") {
-      vscode.commands.executeCommand("workbench.action.terminal.new");
-    }
-  });
+function runInTerminal(command: string) {
+  const terminal =
+    vscode.window.terminals.find((t) => t.name === "lodestone") ||
+    vscode.window.createTerminal("lodestone");
+
+  terminal.show();
+  terminal.sendText(command);
 }
