@@ -87,7 +87,7 @@ export async function statusline(): Promise<number> {
     // Build output line (v2: prefer rate_limits, add weekly, pacing, advisor glyph)
     const profile = resolveActingProfile()?.name ?? "?";
     const contextPctStr = typedInput.context_window?.used_percentage
-      ? ` · ctx ${typedInput.context_window.used_percentage}%`
+      ? ` · ctx ${Math.round(typedInput.context_window.used_percentage)}%`
       : "";
 
     // Cache warmth segment: locate latest session for workspace and show TTL
@@ -135,8 +135,11 @@ export async function statusline(): Promise<number> {
         writeUsageCache(currentProfile.configDir, cacheData);
       }
 
-      // 5h segment with pacing
-      const fiveHourPct = typedInput.rate_limits.five_hour?.used_percentage;
+      // Claude Code reports these as floats: a real render showed
+      // "7.000000000000001%". Round once, here, so no downstream surface has to.
+      const rawFiveHour = typedInput.rate_limits.five_hour?.used_percentage;
+      const fiveHourPct =
+        rawFiveHour === undefined ? undefined : Math.round(rawFiveHour);
       if (fiveHourPct !== undefined) {
         // Pacing: where linear consumption *should* be right now, derived from
         // how much of the 5h window has elapsed. Burning ahead of it earns a ▲.
@@ -165,7 +168,9 @@ export async function statusline(): Promise<number> {
       }
 
       // 7d segment
-      const weeklyPct = typedInput.rate_limits.seven_day?.used_percentage;
+      const rawWeekly = typedInput.rate_limits.seven_day?.used_percentage;
+      const weeklyPct =
+        rawWeekly === undefined ? undefined : Math.round(rawWeekly);
       if (weeklyPct !== undefined) {
         weeklyStr = ` · wk ${quotaBar(weeklyPct)} ${weeklyPct}%`;
 

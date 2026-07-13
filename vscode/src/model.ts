@@ -145,6 +145,9 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
 
     [fiveHourPct, fiveHourResetsAt] = readSeg(data.five_hour);
     [sevenDayPct, sevenDayResetsAt] = readSeg(data.seven_day);
+    // These arrive as floats (a real render showed 7.000000000000001%).
+    if (fiveHourPct !== undefined) fiveHourPct = Math.round(fiveHourPct);
+    if (sevenDayPct !== undefined) sevenDayPct = Math.round(sevenDayPct);
 
     return {
       source,

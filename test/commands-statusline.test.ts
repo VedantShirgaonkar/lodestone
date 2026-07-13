@@ -385,3 +385,35 @@ test("statusline: omits cache segment when no session exists", async () => {
 
   await rm(testHome, { recursive: true, force: true });
 });
+
+test("statusline v2: never prints a float percentage", async () => {
+  const testHome = resolve(testDir, "home-float");
+  const configDir = resolve(testHome, ".claude");
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
+  await mkdir(configDir, { recursive: true });
+  await writeFile(
+    resolve(testHome, ".config/lodestone/config.json"),
+    JSON.stringify({ schema: 1, profiles: { personal: { configDir } }, settings: {} })
+  );
+
+  // Claude Code really does send values like this after a window resets.
+  const input = JSON.stringify({
+    session_id: "s1",
+    context_window: { used_percentage: 98.4 },
+    rate_limits: {
+      five_hour: { used_percentage: 7.000000000000001, resets_at: Math.floor(Date.now() / 1000) + 17160 },
+      seven_day: { used_percentage: 89.99999999 },
+    },
+  });
+
+  const { stdout, code } = await runStatusline(input, {
+    HOME: testHome,
+    XDG_CONFIG_HOME: resolve(testHome, ".config"),
+  });
+
+  assert.equal(code, 0);
+  assert.doesNotMatch(stdout, /\d+\.\d+%/, "no fractional percentages reach the status line");
+  assert.match(stdout, /5h .*\b7%/, "rounded to a whole number");
+  assert.match(stdout, /wk .*\b90%/);
+  await rm(testHome, { recursive: true, force: true });
+});
