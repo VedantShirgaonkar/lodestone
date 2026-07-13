@@ -9,10 +9,10 @@
     "color": "#161A20",
     "theme": "dark"
   },
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/VedantShirgaonkar/lodestone"
+    "url": "https://github.com/VedantShirgaonkar/lodestone.git"
   },
   "engines": {
     "vscode": "^1.85.0"
@@ -32,11 +32,11 @@
       },
       {
         "command": "lodestone.handoffSwitch",
-        "title": "Lodestone: Handoff & Switch Account…"
+        "title": "Lodestone: Handoff and Switch Account..."
       },
       {
         "command": "lodestone.keepWarm",
-        "title": "Lodestone: Keep Current Account Warm…"
+        "title": "Lodestone: Keep Current Account Warm..."
       },
       {
         "command": "lodestone.openDash",
@@ -80,5 +80,10 @@
     "handoff",
     "account-switching",
     "statusline"
-  ]
+  ],
+  "bugs": {
+    "url": "https://github.com/VedantShirgaonkar/lodestone/issues"
+  },
+  "homepage": "https://github.com/VedantShirgaonkar/lodestone#readme",
+  "qna": "marketplace"
 }
