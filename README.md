@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/v/lodestone-cli?color=7c6cba&label=npm" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/dm/lodestone-cli?color=7c6cba&label=downloads" alt="npm downloads"></a>
+  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/node/v/lodestone-cli?color=7c6cba" alt="node version"></a>
   <a href="https://open-vsx.org/extension/VedantShirgaonkar/lodestone"><img src="https://img.shields.io/open-vsx/v/VedantShirgaonkar/lodestone?color=4ad6f0&label=open%20vsx" alt="Open VSX version"></a>
   <a href="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml"><img src="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>

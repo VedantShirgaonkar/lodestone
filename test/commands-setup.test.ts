@@ -31,8 +31,13 @@ function runSetup(
 }
 
 test("setup: non-TTY run exits 0 and prints command list", async () => {
+  // HOME and XDG_CONFIG_HOME have to move together. lodestoneConfigPath()
+  // prefers XDG and falls back to HOME, so overriding one and inheriting the
+  // other points the command at a config we did not create.
+  const home = "/tmp/test-setup";
   const { stdout, stderr, code } = await runSetup([], {
-    HOME: "/tmp/test-setup",
+    HOME: home,
+    XDG_CONFIG_HOME: `${home}/.config`,
   });
 
   assert.equal(code, 0, "exit code should be 0");

@@ -18,104 +18,119 @@ const __testDir = fileURLToPath(new URL(".", import.meta.url));
 const FIXTURE_SMALL = resolve(__testDir, "fixtures/session-small.jsonl");
 const FAKE_CLAUDE = resolve(__testDir, "../..", "test/fake-claude.sh");
 
+/**
+ * Point the entire config environment at a scratch home for the duration of fn.
+ *
+ * Overriding HOME alone is not enough, and quietly not enough: lodestoneConfigPath()
+ * prefers XDG_CONFIG_HOME and only falls back to HOME. On any machine that sets
+ * XDG_CONFIG_HOME (every GitHub runner, and most Linux desktops) a test that
+ * overrides HOME alone reads and WRITES the developer's real lodestone config,
+ * while passing on a Mac where the variable happens to be unset. Each of these
+ * tests used to hand-roll its own save/restore of a slightly different set of
+ * variables, which is exactly how the gap opened.
+ */
+async function withScratchHome(
+  testHome: string,
+  fn: () => Promise<void>,
+  extra: Record<string, string> = {}
+): Promise<void> {
+  const keys = ["HOME", "XDG_CONFIG_HOME", "CLAUDE_CONFIG_DIR", ...Object.keys(extra)];
+  const saved = new Map(keys.map((k) => [k, process.env[k]]));
+
+  process.env.HOME = testHome;
+  process.env.XDG_CONFIG_HOME = resolve(testHome, ".config");
+  delete process.env.CLAUDE_CONFIG_DIR;
+  for (const [k, v] of Object.entries(extra)) process.env[k] = v;
+
+  try {
+    await fn();
+  } finally {
+    for (const [k, v] of saved) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+}
+
 // Profile tests
 test("cli: profile add creates profile", async () => {
+  const testHome = resolve(testDir, "home1");
   try {
-    const testHome = resolve(testDir, "home1");
     await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: {}, settings: {} }));
 
-    const oldHome = process.env.HOME;
-    process.env.HOME = testHome;
-    try {
+    await withScratchHome(testHome, async () => {
       const result = await main(["profile", "add", "test-profile"]);
       assert.strictEqual(result, 0);
       const config = JSON.parse(await readFile(configPath, "utf-8"));
       assert.ok(config.profiles["test-profile"]);
-    } finally {
-      if (oldHome !== undefined) process.env.HOME = oldHome;
-      else delete process.env.HOME;
-    }
+    });
   } finally {
-    await rm(resolve(testDir, "home1"), { recursive: true, force: true });
+    await rm(testHome, { recursive: true, force: true });
   }
 });
 
 test("cli: profile add rejects duplicate", async () => {
+  const testHome = resolve(testDir, "home2");
   try {
-    const testHome = resolve(testDir, "home2");
     await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { existing: { configDir: `${testHome}/.claude-profiles/existing` } }, settings: {} }));
 
-    const oldHome = process.env.HOME;
-    process.env.HOME = testHome;
-    try {
+    await withScratchHome(testHome, async () => {
       const result = await main(["profile", "add", "existing"]);
       assert.strictEqual(result, 1);
-    } finally {
-      if (oldHome !== undefined) process.env.HOME = oldHome;
-      else delete process.env.HOME;
-    }
+    });
   } finally {
-    await rm(resolve(testDir, "home2"), { recursive: true, force: true });
+    await rm(testHome, { recursive: true, force: true });
   }
 });
 
 test("cli: profile list shows profiles", async () => {
+  const testHome = resolve(testDir, "home3");
   try {
-    const testHome = resolve(testDir, "home3");
     await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: `${testHome}/.claude` }, work: { configDir: `${testHome}/.claude-profiles/work` } }, settings: {} }));
 
-    const oldHome = process.env.HOME;
-    const oldClaudeConfig = process.env.CLAUDE_CONFIG_DIR;
-    process.env.HOME = testHome;
-    process.env.CLAUDE_CONFIG_DIR = `${testHome}/.claude`;
-
-    let output = "";
-    const oldLog = console.log;
-    console.log = (msg: string) => { output += msg + "\n"; };
-
-    try {
-      const result = await main(["profile", "list"]);
-      assert.strictEqual(result, 0);
-      assert.match(output, /personal/);
-      assert.match(output, /work/);
-    } finally {
-      console.log = oldLog;
-      if (oldHome !== undefined) process.env.HOME = oldHome;
-      else delete process.env.HOME;
-      if (oldClaudeConfig !== undefined) process.env.CLAUDE_CONFIG_DIR = oldClaudeConfig;
-      else delete process.env.CLAUDE_CONFIG_DIR;
-    }
+    await withScratchHome(
+      testHome,
+      async () => {
+        let output = "";
+        const oldLog = console.log;
+        console.log = (msg: string) => { output += msg + "\n"; };
+        try {
+          const result = await main(["profile", "list"]);
+          assert.strictEqual(result, 0);
+          assert.match(output, /personal/);
+          assert.match(output, /work/);
+        } finally {
+          console.log = oldLog;
+        }
+      },
+      { CLAUDE_CONFIG_DIR: `${testHome}/.claude` }
+    );
   } finally {
-    await rm(resolve(testDir, "home3"), { recursive: true, force: true });
+    await rm(testHome, { recursive: true, force: true });
   }
 });
 
 test("cli: profile remove removes from registry", async () => {
+  const testHome = resolve(testDir, "home4");
   try {
-    const testHome = resolve(testDir, "home4");
     await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { doomed: { configDir: `${testHome}/.claude-profiles/doomed` } }, settings: {} }));
 
-    const oldHome = process.env.HOME;
-    process.env.HOME = testHome;
-    try {
+    await withScratchHome(testHome, async () => {
       const result = await main(["profile", "remove", "doomed"]);
       assert.strictEqual(result, 0);
       const config = JSON.parse(await readFile(configPath, "utf-8"));
       assert.ok(!config.profiles["doomed"]);
-    } finally {
-      if (oldHome !== undefined) process.env.HOME = oldHome;
-      else delete process.env.HOME;
-    }
+    });
   } finally {
-    await rm(resolve(testDir, "home4"), { recursive: true, force: true });
+    await rm(testHome, { recursive: true, force: true });
   }
 });
 
