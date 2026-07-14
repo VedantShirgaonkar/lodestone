@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.4.0] - 2026-07-14
+## [0.5.0] - 2026-07-14
 
 **A release-gate audit of every feature, run the way a new user would hit them. It found two features that had never existed and one bug that hid three of nine real projects.**
 
@@ -24,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ### Added
 
+- **`lodestone uninstall`**: the inverse of `init`. Removes the hooks, the statusline (only when it is lodestone's own), and the `/handoff` skill from every profile, and stops running keepalive schedulers first, so no scheduler keeps spending on behalf of a tool being removed. It never deletes profile config dirs, handoff files, or the profile registry, and it prints what it left in place and how to remove that too. `--project` does the same for a single project.
+- **Per-model weekly quota rows.** The usage endpoint returns model-specific weekly buckets (`seven_day_opus`, `seven_day_sonnet`) on plans that meter them; they were captured and shown nowhere. `dash` and the extension panel now render a row per bucket the endpoint actually returns, handled generically, so if Anthropic adds a bucket for another model it appears without a code change. Buckets the endpoint returns as null render nothing: most plans have no per-model caps, and a row for an unmetered model would be an invention.
 - `--help` now lists `config`, `trail` and `refresh` — three commands the README pointed at that the CLI never mentioned — and `lodestone help <cmd>` exists for `init`, `config`, `trail`, `refresh` and documents `switch --keep-warm`.
 - `lodestone config get/set autoSnapshot` and `maxAgeDays`: the hooks always honored both settings; now something can set them.
 - The advisor hook has direct tests: the 85% warning, silence below thresholds, and the 95% recovery snapshot verified on disk. The keepalive lifecycle, the skill install, the munge rule, and the no-percentage statusline are all under test. 205 tests.

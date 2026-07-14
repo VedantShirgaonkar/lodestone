@@ -6,7 +6,7 @@ TypeScript, ESM, Node >= 20, **zero runtime dependencies** (dev-only: typescript
 
 ## Commands
 - `npm run build` : tsc to `dist/`
-- `npm test` : build + `node --test` (205 tests)
+- `npm test` : build + `node --test` (210 tests)
 - `npm run compile --prefix vscode` : the extension (CommonJS, the VS Code host requires it)
 
 ## Source of truth (read before changing anything)

@@ -225,3 +225,63 @@ test("handoff --distill --session: reaches the distiller instead of throwing on 
   assert.match(result.stdout, /distilling on profile personal/, "cost line must print before spending");
   assert.match(result.stdout, /distilled: \.claude\/handoff\/latest\.md/);
 });
+
+test("uninstall: removes exactly what init installed, and nothing of the user's", async () => {
+  const w = world();
+  mkdirSync(w.claudeDir, { recursive: true });
+
+  // The user has their own hook and their own statusline before lodestone.
+  writeFileSync(
+    join(w.claudeDir, "settings.json"),
+    JSON.stringify({
+      statusLine: { type: "command", command: "my-own-statusline" },
+      hooks: {
+        SessionStart: [{ hooks: [{ type: "command", command: "some-other-tool --init" }] }],
+      },
+    }),
+    "utf8"
+  );
+
+  // Install (statusline install must refuse to clobber theirs without --force).
+  const init1 = await runCli(["init", "--statusline"], w.env);
+  assert.equal(init1.code, 0, init1.stderr);
+  assert.match(init1.stderr + init1.stdout, /already set/, "must not clobber a foreign statusline");
+
+  const un = await runCli(["uninstall"], w.env);
+  assert.equal(un.code, 0, un.stderr);
+  assert.match(un.stdout, /hooks removed/);
+  assert.match(un.stdout, /\/handoff skill removed/);
+  assert.match(un.stdout, /left in place/);
+
+  const settings = JSON.parse(readFileSync(join(w.claudeDir, "settings.json"), "utf8"));
+  const flat = JSON.stringify(settings);
+  assert.doesNotMatch(flat, /lodestone hook/, "our hooks must be gone");
+  assert.match(flat, /some-other-tool --init/, "their hook must survive");
+  assert.equal(
+    settings.statusLine?.command,
+    "my-own-statusline",
+    "their statusline is not ours to take down"
+  );
+  assert.ok(
+    !existsSync(join(w.claudeDir, "skills", "handoff", "SKILL.md")),
+    "the skill file must be gone"
+  );
+
+  // Idempotent: a second run finds nothing and still exits 0.
+  const again = await runCli(["uninstall"], w.env);
+  assert.equal(again.code, 0);
+});
+
+test("uninstall: takes down our own statusline when it is ours", async () => {
+  const w = world();
+  mkdirSync(w.claudeDir, { recursive: true });
+
+  await runCli(["init", "--statusline"], w.env);
+  const before = JSON.parse(readFileSync(join(w.claudeDir, "settings.json"), "utf8"));
+  assert.equal(before.statusLine?.command, "lodestone statusline");
+
+  const un = await runCli(["uninstall"], w.env);
+  assert.match(un.stdout, /statusline removed/);
+  const after = JSON.parse(readFileSync(join(w.claudeDir, "settings.json"), "utf8"));
+  assert.equal(after.statusLine, undefined, "our statusline must be gone");
+});

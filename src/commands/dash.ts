@@ -52,6 +52,8 @@ interface ProfileQuotaBlock {
   login: string;
   fiveHour: QuotaBar;
   sevenDay: QuotaBar;
+  /** Model-specific weekly buckets, only when the usage endpoint returns them. */
+  perModelWeekly?: Array<{ model: string; pct?: number; resetsAt?: number }>;
   sessions: SessionLine[];
 }
 
@@ -192,13 +194,17 @@ async function buildFrame(
     // Get recent sessions for this profile
     const sessions = await getRecentSessions(configDir, now);
 
-    profiles.push({
+    const block: ProfileQuotaBlock = {
       name,
       login: loginHint,
       fiveHour: fiveHourBar,
       sevenDay: sevenDayBar,
       sessions,
-    });
+    };
+    if (quota.perModelWeekly) {
+      block.perModelWeekly = quota.perModelWeekly;
+    }
+    profiles.push(block);
 
     // Check for advisor line (≥85% on 5h or ≥90% on 7d)
     if (
@@ -435,6 +441,22 @@ function renderFrame(frame: DashFrame): void {
 
     // 7d quota bar
     lines.push(renderQuotaBar("wk", profile.sevenDay));
+
+    // Model-specific weekly caps, when the endpoint meters them separately.
+    for (const row of profile.perModelWeekly ?? []) {
+      if (row.pct === undefined) continue;
+      const bar = progressBar(Math.max(0, Math.min(row.pct, 100)), 100, 15);
+      let resetStr = "";
+      if (row.resetsAt) {
+        const secs = row.resetsAt - Math.floor(Date.now() / 1000);
+        if (secs > 0) {
+          const mins = Math.floor(secs / 60);
+          const hours = Math.floor(mins / 60);
+          resetStr = ` · resets in ${hours > 0 ? `${hours}h ${mins % 60}m` : `${mins}m`}`;
+        }
+      }
+      lines.push(`  wk (${row.model}) ${bar}${resetStr} · ${dim("(live)")}`);
+    }
 
     // Sessions
     for (const session of profile.sessions) {

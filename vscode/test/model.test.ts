@@ -779,3 +779,48 @@ test("cacheWarmth: a path with a space finds its transcripts", () => {
     `space-path workspace must be found, got: ${String(result.minutesRemaining)}`
   );
 });
+
+/**
+ * Test: per-model weekly rows appear in the tooltip only when the CLI's oauth
+ * cache carries non-null buckets for them.
+ */
+test("tooltip: renders per-model weekly rows from the oauth cache", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  mkdirSync(join(tmpDir, "lodestone"), { recursive: true });
+
+  // The statusline bridge (main quota source)…
+  writeFileSync(
+    join(tmpDir, "lodestone", "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "oauth",
+      five_hour: { used_percentage: 40, resets_at_ts: Math.floor(Date.now() / 1000) + 3600 },
+      seven_day: { used_percentage: 55, resets_at_ts: Math.floor(Date.now() / 1000) + 90000 },
+    })
+  );
+  // …and the oauth cache with an opus bucket, sonnet null.
+  writeFileSync(
+    join(tmpDir, "lodestone", "usage-live.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "oauth",
+      seven_day_opus: { used_percentage: 71, resets_at_ts: Math.floor(Date.now() / 1000) + 90000 },
+      seven_day_sonnet: null,
+    })
+  );
+
+  const quota = loadProfileQuota(tmpDir);
+  assert.ok(quota.perModelWeekly, "opus bucket must surface");
+  assert.equal(quota.perModelWeekly?.[0]?.model, "opus");
+  assert.equal(quota.perModelWeekly?.[0]?.pct, 71);
+
+  const model: StatusModel = {
+    profiles: new Map([["personal", quota]]),
+    profileLabels: new Map(),
+    cacheWarmth: new Map(),
+    advisorThresholds: { fiveHourPct: 85, weeklyPct: 90 },
+  };
+  const md = buildTooltipMarkdown(model);
+  assert.match(md, /Weekly \(opus\)/, `tooltip must carry the opus row: ${md}`);
+  assert.doesNotMatch(md, /Weekly \(sonnet\)/, "a null bucket is not a row");
+});

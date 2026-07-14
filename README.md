@@ -150,6 +150,7 @@ Once `lodestone init` has run, four things work on their own:
 - **No telemetry, ever.**
 - **Hooks cannot break your session.** Every path exits cleanly in under two seconds, and failures go to a log file instead of your terminal.
 - **Anything that would spend tokens is opt in**, prints its estimated cost first, and refuses when the cache is too cold to be worth it.
+- **Leaving is one command.** `lodestone uninstall` removes the hooks, the status line and the skill, stops any keepalive, and tells you what it left and how to remove that too.
 
 ---
 

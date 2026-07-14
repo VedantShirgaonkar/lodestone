@@ -133,3 +133,39 @@ test("realUsage: cache returns undefined on corrupted json", async () => {
 
   rmSync(testDir, { recursive: true });
 });
+
+test("realUsage: per-model weekly buckets surface only when the endpoint returns them", async () => {
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const { tmpdir } = await import("node:os");
+  const { getQuota } = await import("../src/core/realUsage.js");
+
+  const configDir = mkdtempSync(join(tmpdir(), "lodestone-permodel-"));
+  mkdirSync(join(configDir, "lodestone"), { recursive: true });
+
+  // What the oauth cache looks like on a plan WITH an opus cap: opus is a
+  // real bucket, sonnet is null (the endpoint's way of saying "not metered"),
+  // and a hypothetical future fable bucket must come through generically.
+  writeFileSync(
+    join(configDir, "lodestone", "usage-live.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "oauth",
+      five_hour: { used_percentage: 40, resets_at_ts: 1800000000 },
+      seven_day: { used_percentage: 55, resets_at_ts: 1800600000 },
+      seven_day_opus: { used_percentage: 71, resets_at_ts: 1800600000 },
+      seven_day_sonnet: null,
+      seven_day_fable: { utilization: 12.6, resets_at: "2027-01-15T00:00:00Z" },
+    }),
+    "utf8"
+  );
+
+  const quota = await getQuota(configDir, "2.1.206", true);
+
+  const models = (quota.perModelWeekly ?? []).map((r) => r.model).sort();
+  assert.deepEqual(models, ["fable", "opus"], "non-null buckets only, any model name");
+  const opus = quota.perModelWeekly?.find((r) => r.model === "opus");
+  assert.equal(opus?.pct, 71);
+  const fable = quota.perModelWeekly?.find((r) => r.model === "fable");
+  assert.equal(fable?.pct, 13, "endpoint-shaped {utilization} is normalized and rounded");
+});

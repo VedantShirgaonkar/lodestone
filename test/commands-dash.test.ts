@@ -173,3 +173,41 @@ test("dash --once: estimate shows measured tokens, never a percentage of a guess
   assert.doesNotMatch(fiveHourLine, /\d+%/, `no fabricated %: ${fiveHourLine}`);
   await rm(testHome, { recursive: true, force: true });
 });
+
+test("dash --once: shows per-model weekly rows only when the endpoint returns them", async () => {
+  const testHome = resolve(testDir, "home-permodel");
+  const configDir = resolve(testHome, ".claude");
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
+  await mkdir(resolve(configDir, "lodestone"), { recursive: true });
+  await writeFile(
+    resolve(testHome, ".config/lodestone/config.json"),
+    JSON.stringify({
+      schema: 1,
+      profiles: { personal: { configDir } },
+      settings: { realUsage: true },
+    })
+  );
+  // A fresh oauth cache with an opus bucket; sonnet null must not render.
+  await writeFile(
+    resolve(configDir, "lodestone", "usage-live.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "oauth",
+      five_hour: { used_percentage: 40, resets_at_ts: Math.floor(Date.now() / 1000) + 3600 },
+      seven_day: { used_percentage: 55, resets_at_ts: Math.floor(Date.now() / 1000) + 90000 },
+      seven_day_opus: { used_percentage: 71, resets_at_ts: Math.floor(Date.now() / 1000) + 90000 },
+      seven_day_sonnet: null,
+    })
+  );
+
+  const { stdout, code } = await runDash({
+    HOME: testHome,
+    XDG_CONFIG_HOME: resolve(testHome, ".config"),
+    NO_COLOR: "1",
+  });
+
+  assert.equal(code, 0);
+  assert.match(stdout, /wk \(opus\)/, `opus bucket must render: ${stdout}`);
+  assert.doesNotMatch(stdout, /wk \(sonnet\)/, "a null bucket is not a row");
+  await rm(testHome, { recursive: true, force: true });
+});

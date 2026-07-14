@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.5
+
+- **Per-model weekly quota rows in the panel.** When the usage endpoint meters a model separately (`seven_day_opus`, `seven_day_sonnet` on plans with per-model caps), the panel shows a `Weekly (opus)` row with its own bar and reset countdown. Handled generically: any bucket the endpoint returns appears, buckets it returns as null render nothing. Requires `lodestone-cli` with `realUsage` on.
+- Pairs with `lodestone-cli` 0.5.0, which adds `lodestone uninstall` and the keepalive/skill/munge fixes from the release-gate audit.
+
 ## 0.1.4
 
 - **Cache warmth now works for workspaces whose path contains a space, dot or underscore.** Claude Code names its transcript directories by replacing every non-alphanumeric character with a dash; the extension replaced only slashes, so such workspaces munged to a directory that does not exist and their cache read "cold" forever. Requires nothing from you beyond updating.

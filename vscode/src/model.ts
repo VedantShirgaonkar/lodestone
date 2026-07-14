@@ -24,6 +24,9 @@ export interface ProfileQuotaData {
   fiveHourResetsAt?: number;
   sevenDayPct?: number;
   sevenDayResetsAt?: number;
+  /** Model-specific weekly buckets (e.g. "opus"), only when the usage
+   *  endpoint returns them non-null. Most plans have none. */
+  perModelWeekly?: Array<{ model: string; pct: number; resetsAt?: number }>;
   fetchedAt?: number;
   stale: boolean;
 }
@@ -149,7 +152,7 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
     if (fiveHourPct !== undefined) fiveHourPct = Math.round(fiveHourPct);
     if (sevenDayPct !== undefined) sevenDayPct = Math.round(sevenDayPct);
 
-    return {
+    const result: ProfileQuotaData = {
       source,
       fiveHourPct,
       fiveHourResetsAt,
@@ -158,6 +161,41 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
       fetchedAt,
       stale,
     };
+
+    // Per-model weekly buckets live in the CLI's oauth cache (usage-live.json),
+    // written when realUsage is on. Only rows the endpoint returned non-null:
+    // most plans have none, and a row for a model the endpoint does not meter
+    // would be invented.
+    try {
+      const livePath = join(configDir, "lodestone", "usage-live.json");
+      if (existsSync(livePath)) {
+        const live = JSON.parse(readFileSync(livePath, "utf8")) as Record<string, unknown> & {
+          fetchedAt?: number;
+        };
+        const liveFresh =
+          typeof live.fetchedAt === "number" &&
+          Date.now() - live.fetchedAt < 10 * 60 * 1000;
+        if (liveFresh) {
+          const rows: NonNullable<ProfileQuotaData["perModelWeekly"]> = [];
+          for (const [key, value] of Object.entries(live)) {
+            if (!key.startsWith("seven_day_") || key === "seven_day") continue;
+            const [pct, ts] = readSeg(value);
+            if (pct === undefined) continue;
+            const row: { model: string; pct: number; resetsAt?: number } = {
+              model: key.slice("seven_day_".length),
+              pct: Math.round(pct),
+            };
+            if (ts !== undefined) row.resetsAt = ts;
+            rows.push(row);
+          }
+          if (rows.length > 0) result.perModelWeekly = rows;
+        }
+      }
+    } catch {
+      // per-model rows are a bonus, never a failure
+    }
+
+    return result;
   } catch {
     return { source: "none", stale: false };
   }
@@ -363,6 +401,9 @@ export function buildTooltipMarkdown(model: StatusModel): string {
 
       row("5-hour", quota.fiveHourPct, quota.fiveHourResetsAt);
       row("Weekly", quota.sevenDayPct, quota.sevenDayResetsAt);
+      for (const perModel of quota.perModelWeekly ?? []) {
+        row(`Weekly (${perModel.model})`, perModel.pct, perModel.resetsAt);
+      }
       lines.push("");
     }
   }

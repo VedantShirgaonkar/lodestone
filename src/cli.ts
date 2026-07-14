@@ -20,6 +20,7 @@ import { audit } from "./commands/audit.js";
 import { trail } from "./commands/trail.js";
 import { refresh } from "./commands/refresh.js";
 import { setup } from "./commands/setup.js";
+import { uninstall } from "./commands/uninstall.js";
 
 /**
  * Read the version from package.json rather than repeating it here. The
@@ -66,6 +67,7 @@ const COMMAND_NAMES = new Set([
   "trail",
   "refresh",
   "setup",
+  "uninstall",
   "help",
 ]);
 
@@ -193,6 +195,9 @@ export async function main(argv: string[]): Promise<number> {
 
       case "setup":
         return await setup(commandArgs2, cmdOpts);
+
+      case "uninstall":
+        return await uninstall(commandArgs2, cmdOpts);
 
       case "help": {
         const helpCmd = commandArgs2[0];
@@ -322,6 +327,7 @@ Commands:
   keepalive            Keep session warm with TTL refresh pings
   audit                Analyze handoff and switch events
   init                 Initialize hooks, statusline, and the /handoff skill
+  uninstall            Remove hooks, statusline, and the skill from Claude Code
   config               Get or set lodestone settings
 
 Internal:
@@ -405,6 +411,18 @@ Options:
   --statusline         Also configure the live status line
   --project            Install into this project's .claude/ instead of profiles
   --force              Overwrite an existing statusline command`,
+
+    uninstall: `lodestone uninstall — remove everything lodestone wired into Claude Code
+
+Usage: lodestone uninstall [--project]
+
+Removes the hooks, the statusline (only when it is lodestone's), and the
+/handoff skill from every profile, and stops running keepalive schedulers.
+Never deletes profile config dirs, handoff files, or the lodestone registry;
+it prints what it left and how to remove that too.
+
+Options:
+  --project            Remove from this project's .claude/ instead of profiles`,
 
     config: `lodestone config — get or set lodestone settings
 

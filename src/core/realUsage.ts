@@ -31,9 +31,34 @@ export interface QuotaResult {
   fiveHourResetsAt?: number | undefined;
   sevenDayUtilization?: number | undefined;
   sevenDayResetsAt?: number | undefined;
+  /** Per-model weekly buckets, exactly as the usage endpoint names them
+   *  (`seven_day_opus` → "opus"). Only buckets the endpoint returned non-null:
+   *  most plans have none, and inventing rows for models the endpoint does not
+   *  meter would be fabrication. Generic on purpose — if Anthropic adds
+   *  `seven_day_fable` tomorrow, it appears here without a code change. */
+  perModelWeekly?: Array<{ model: string; pct?: number; resetsAt?: number }> | undefined;
   hasPacing?: boolean | undefined;
   /** How old the figures are. 0 = fetched just now. Surfaces as "(3m ago)". */
   ageSeconds?: number | undefined;
+}
+
+/** Scan a cache record for non-null `seven_day_<model>` buckets. */
+function perModelWeeklyOf(
+  data: Record<string, unknown>
+): QuotaResult["perModelWeekly"] {
+  const rows: NonNullable<QuotaResult["perModelWeekly"]> = [];
+  for (const [key, value] of Object.entries(data)) {
+    if (!key.startsWith("seven_day_") || key === "seven_day") continue;
+    const seg = normalizeSegment(value as UsageBudgetSegment | null | undefined);
+    if (!seg) continue;
+    const row: { model: string; pct?: number; resetsAt?: number } = {
+      model: key.slice("seven_day_".length),
+    };
+    if (seg.used_percentage !== undefined) row.pct = seg.used_percentage;
+    if (seg.resets_at_ts !== undefined) row.resetsAt = seg.resets_at_ts;
+    rows.push(row);
+  }
+  return rows.length > 0 ? rows : undefined;
 }
 
 /** A quota climbing during heavy work goes visibly wrong within minutes. */
@@ -196,17 +221,28 @@ export async function fetchOAuthQuota(
       return undefined;
     }
 
-    const json = (await response.json()) as Partial<UsageCacheData>;
+    const json = (await response.json()) as Partial<UsageCacheData> &
+      Record<string, unknown>;
+
+    // Pass through every seven_day_* bucket the endpoint returns, not a
+    // hardcoded pair. Today it defines seven_day_opus and seven_day_sonnet
+    // (null on plans without per-model caps); if a seven_day_fable appears,
+    // it must survive this function or no UI can ever show it.
+    const perModel: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(json)) {
+      if (key.startsWith("seven_day_")) {
+        perModel[key] = value;
+      }
+    }
 
     return {
       fetchedAt: Date.now(),
       source: "oauth",
       five_hour: json.five_hour,
       seven_day: json.seven_day,
-      seven_day_opus: json.seven_day_opus,
-      seven_day_sonnet: json.seven_day_sonnet,
+      ...perModel,
       extra_usage: json.extra_usage,
-    };
+    } as UsageCacheData;
   } catch {
     // Network error, timeout, or abort
     return undefined;
@@ -282,6 +318,7 @@ export async function getQuota(
     fiveHourResetsAt: data.five_hour?.resets_at_ts,
     sevenDayUtilization: data.seven_day?.used_percentage,
     sevenDayResetsAt: data.seven_day?.resets_at_ts,
+    perModelWeekly: perModelWeeklyOf(data as unknown as Record<string, unknown>),
     hasPacing: true,
     ageSeconds: Math.max(0, Math.round((Date.now() - data.fetchedAt) / 1000)),
   });
@@ -298,17 +335,24 @@ export async function getQuota(
     }
     const oauthData = await fetchOAuthQuota(configDir, claudeVersion, fetchImpl);
     if (oauthData) {
-      writeJson(oauthCachePath(configDir), {
-        ...oauthData,
-        five_hour: normalizeSegment(oauthData.five_hour),
-        seven_day: normalizeSegment(oauthData.seven_day),
-      });
+      // Normalize every segment on write, the per-model buckets included,
+      // so readers never have to know the endpoint's field spelling.
+      const normalized: Record<string, unknown> = { ...oauthData };
+      for (const [key, value] of Object.entries(oauthData)) {
+        if (key === "five_hour" || key === "seven_day" || key.startsWith("seven_day_")) {
+          normalized[key] = normalizeSegment(
+            value as UsageBudgetSegment | null | undefined
+          );
+        }
+      }
+      writeJson(oauthCachePath(configDir), normalized as unknown as UsageCacheData);
       return {
         source: "oauth",
         fiveHourUtilization: normalizeSegment(oauthData.five_hour)?.used_percentage,
         fiveHourResetsAt: normalizeSegment(oauthData.five_hour)?.resets_at_ts,
         sevenDayUtilization: normalizeSegment(oauthData.seven_day)?.used_percentage,
         sevenDayResetsAt: normalizeSegment(oauthData.seven_day)?.resets_at_ts,
+        perModelWeekly: perModelWeeklyOf(oauthData as unknown as Record<string, unknown>),
         ageSeconds: 0,
       };
     }
