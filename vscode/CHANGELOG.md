@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.3
+
+The extension's own code is unchanged. This release is about what sits underneath it, and what the listing says.
+
+- **Update the CLI: `npm install -g lodestone-cli`.** The Savings section of the panel and the Dashboard were empty for everyone, because the CLI's `audit` had never reported a single event and `dash` never listed a live session. Both are fixed in `lodestone-cli` 0.3.0 and newer, along with the advisor hook, which had never been installed at all. The extension shells out to the CLI for all of this, so updating the CLI is what fixes the panel.
+- The listing now explains the thin-client design up front, links to the CLI on npm, shows the guided `lodestone setup` in place of a four-command install, and carries the setup wizard screenshot.
+
 ## 0.1.2
 
 Fixes to the quota panel, found by using it.
