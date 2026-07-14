@@ -167,6 +167,8 @@ Most of this has nothing to do with switching. Cache expiry, limit resets and bl
 | **CLI** | `npm install -g lodestone-cli` ([npm](https://www.npmjs.com/package/lodestone-cli)) |
 | **Editor extension** | Search **Lodestone** in your Extensions panel ([Open VSX](https://open-vsx.org/extension/VedantShirgaonkar/lodestone)) |
 
+If the install fails with `EACCES: permission denied`, your npm prefix points at a root-owned directory (common with the macOS Node installer). Fix it once, without sudo: `npm config set prefix ~/.local`, make sure `~/.local/bin` is on your PATH, and run the install again.
+
 The extension works in any editor that reads the Open VSX Registry: Cursor, Windsurf, Devin Desktop, VSCodium, Google Antigravity, AWS Kiro, Gitpod, Eclipse Theia, and others built on the VS Code extension model. It is a thin client. The CLI is the engine, so install that first.
 
 ## Documentation
