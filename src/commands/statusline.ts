@@ -135,11 +135,14 @@ export async function statusline(): Promise<number> {
         writeUsageCache(currentProfile.configDir, cacheData);
       }
 
-      // Claude Code reports these as floats: a real render showed
-      // "7.000000000000001%". Round once, here, so no downstream surface has to.
+      // Claude Code reports these as floats ("7.000000000000001%") and can
+      // transiently overshoot right after a limit lands ("107%"). Round and
+      // clamp once, here: a window cannot be more than fully used.
       const rawFiveHour = typedInput.rate_limits.five_hour?.used_percentage;
       const fiveHourPct =
-        rawFiveHour === undefined ? undefined : Math.round(rawFiveHour);
+        rawFiveHour === undefined
+          ? undefined
+          : Math.min(100, Math.max(0, Math.round(rawFiveHour)));
       if (fiveHourPct !== undefined) {
         // Pacing: where linear consumption *should* be right now, derived from
         // how much of the 5h window has elapsed. Burning ahead of it earns a ▲.
@@ -170,7 +173,9 @@ export async function statusline(): Promise<number> {
       // 7d segment
       const rawWeekly = typedInput.rate_limits.seven_day?.used_percentage;
       const weeklyPct =
-        rawWeekly === undefined ? undefined : Math.round(rawWeekly);
+        rawWeekly === undefined
+          ? undefined
+          : Math.min(100, Math.max(0, Math.round(rawWeekly)));
       if (weeklyPct !== undefined) {
         weeklyStr = ` · wk ${quotaBar(weeklyPct)} ${weeklyPct}%`;
 

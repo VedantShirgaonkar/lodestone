@@ -847,3 +847,24 @@ test("listRunningKeepalives: reports only schedulers whose pid is alive", () => 
   assert.equal(running[0]?.profile, "personal");
   assert.equal(running[0]?.pings, 2);
 });
+
+/**
+ * Test: a cached overshoot (feed reported 107% at the limit) renders as 100%.
+ */
+test("loadProfileQuota: clamps percentages to 100", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  mkdirSync(join(tmpDir, "lodestone"), { recursive: true });
+  writeFileSync(
+    join(tmpDir, "lodestone", "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "statusline",
+      five_hour: { used_percentage: 107, resets_at_ts: Math.floor(Date.now() / 1000) + 5400 },
+      seven_day: { used_percentage: 45 },
+    })
+  );
+
+  const quota = loadProfileQuota(tmpDir);
+  assert.equal(quota.fiveHourPct, 100, "a window cannot be more than fully used");
+  assert.equal(quota.sevenDayPct, 45);
+});

@@ -1,0 +1,35 @@
+name: downloads-chart
+
+# Redraw the README's download chart from live sources. npm publishes a real
+# daily series; Open VSX only exposes a current total, so each run also
+# snapshots that total into assets/downloads-data.json - the extension line
+# is built from those observations and nothing else.
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  chart:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/downloads-chart.mjs
+      - name: Commit if changed
+        run: |
+          git config user.name "lodestone-chart"
+          git config user.email "actions@users.noreply.github.com"
+          git add assets/downloads-data.json assets/downloads-light.svg assets/downloads-dark.svg
+          if git diff --cached --quiet; then
+            echo "chart unchanged"
+          else
+            git commit -m "chart: refresh download counts [skip ci]"
+            git push
+          fi

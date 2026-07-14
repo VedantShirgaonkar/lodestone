@@ -150,7 +150,11 @@ function normalizeSegment(
   const ts = seg.resets_at_ts ?? toEpochSeconds(seg.resets_at);
   if (pct === undefined && ts === undefined) return undefined;
   const out: UsageBudgetSegment = {};
-  if (pct !== undefined) out.used_percentage = Math.round(pct);
+  // Clamp to [0, 100]: Claude Code's rate_limits feed can transiently report
+  // used_percentage above 100 right after a limit lands (a real render showed
+  // 107%), and a window cannot be more than fully used. Anthropic's own UI
+  // clamps; so do we, at the one place every reader goes through.
+  if (pct !== undefined) out.used_percentage = Math.min(100, Math.max(0, Math.round(pct)));
   if (ts !== undefined) out.resets_at_ts = ts;
   return out;
 }

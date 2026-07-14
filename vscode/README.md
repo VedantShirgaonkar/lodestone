@@ -95,6 +95,12 @@ This extension reads local files only: your lodestone config, its usage cache, a
 
 ---
 
+## If it saved you a rebuild
+
+Lodestone has no telemetry, so we never see you use it, only the download number. If the panel earned its pixels: a rating here on Open VSX helps others trust it, a star on [the repo](https://github.com/VedantShirgaonkar/lodestone) helps them find it, and anything broken, [tell us](https://github.com/VedantShirgaonkar/lodestone/issues), it gets fixed fast.
+
+---
+
 ## Requirements
 
 - The `lodestone` CLI: `npm install -g lodestone-cli` (Node 20 or newer)

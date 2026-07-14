@@ -1,6 +1,6 @@
 {
   "name": "lodestone-cli",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Stop paying Claude Code's cache tax: usage & cache monitoring, context handoffs, account switching. One command: lodestone.",
   "license": "MIT",
   "type": "module",

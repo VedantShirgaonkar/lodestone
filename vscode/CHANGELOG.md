@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.8
+
+- **No more "107%".** The quota feed can transiently overshoot right after a limit lands; the panel and status bar now clamp percentages to 100, because a window cannot be more than fully used.
+- A short thanks section on the listing. No telemetry means we never see you use this, only the download number: ratings, stars and bug reports are the entire feedback channel.
+
 ## 0.1.7
 
 - The install callout now carries the macOS `EACCES` fix up front (root-owned npm prefix from the macOS Node installer; `npm config set prefix ~/.local`, no sudo). A user hit this as their literal first command.

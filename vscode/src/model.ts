@@ -203,9 +203,12 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
 
     [fiveHourPct, fiveHourResetsAt] = readSeg(data.five_hour);
     [sevenDayPct, sevenDayResetsAt] = readSeg(data.seven_day);
-    // These arrive as floats (a real render showed 7.000000000000001%).
-    if (fiveHourPct !== undefined) fiveHourPct = Math.round(fiveHourPct);
-    if (sevenDayPct !== undefined) sevenDayPct = Math.round(sevenDayPct);
+    // These arrive as floats ("7.000000000000001%") and can transiently
+    // overshoot right after a limit lands ("107%"). Round and clamp: a window
+    // cannot be more than fully used.
+    const clamp = (p: number) => Math.min(100, Math.max(0, Math.round(p)));
+    if (fiveHourPct !== undefined) fiveHourPct = clamp(fiveHourPct);
+    if (sevenDayPct !== undefined) sevenDayPct = clamp(sevenDayPct);
 
     const result: ProfileQuotaData = {
       source,
@@ -238,7 +241,7 @@ export function loadProfileQuota(configDir: string): ProfileQuotaData {
             if (pct === undefined) continue;
             const row: { model: string; pct: number; resetsAt?: number } = {
               model: key.slice("seven_day_".length),
-              pct: Math.round(pct),
+              pct: Math.min(100, Math.max(0, Math.round(pct))),
             };
             if (ts !== undefined) row.resetsAt = ts;
             rows.push(row);

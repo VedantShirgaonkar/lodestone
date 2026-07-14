@@ -513,11 +513,11 @@ function renderQuotaBar(label: string, q: QuotaBar): string {
     }
     return `  ${label} ${dim("no recent data")} · ${dim(`(${q.source})`)}`;
   }
-  // Estimates can legitimately exceed 100% (burn model vs plan budget);
-  // clamp the bar fill but show the true percentage as text.
+  // Live percentages are clamped to 100 at normalization (the feed can
+  // transiently overshoot right after a limit), and estimates no longer
+  // render as percentages at all, so the bar's own clamp is belt-and-braces.
   const bar = progressBar(Math.max(0, Math.min(q.used, 100)), 100, 15);
-  const over = q.used > 100 ? ` ${q.used}%` : "";
-  let line = `  ${label} ${bar}${over} · resets in ${q.resetIn} · ${dim(`(${q.source}`)}`;
+  let line = `  ${label} ${bar} · resets in ${q.resetIn} · ${dim(`(${q.source}`)}`;
 
   if (q.pacing !== undefined && q.pacing > 0) {
     line += dim(`, target ${q.pacing}%`);

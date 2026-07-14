@@ -11,6 +11,15 @@
   <a href="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml"><img src="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>
   <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero runtime dependencies">
+  <a href="https://open-vsx.org/extension/VedantShirgaonkar/lodestone"><img src="https://img.shields.io/open-vsx/dt/VedantShirgaonkar/lodestone?color=4ad6f0&label=extension%20downloads" alt="extension downloads"></a>
+  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/dm/lodestone-cli?color=7c6cba&label=npm%20downloads" alt="npm downloads"></a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/downloads-dark.svg">
+    <img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/downloads-light.svg" alt="downloads over time" width="720">
+  </picture>
 </p>
 
 ```bash
@@ -180,6 +189,16 @@ The extension works in any editor that reads the Open VSX Registry: Cursor, Wind
 - [How Claude Code memory works](docs/explainer/how-claude-code-memory-works.md). The cache physics this is all built on. Worth reading even if you never install anything.
 - [The user guide](docs/GUIDE.md). Every feature, when to use it, and how to read the numbers.
 - [Evaluation](docs/EVALUATION.md). How the savings are measured, and what the measurement does not prove.
+
+## If it saved you a rebuild
+
+Lodestone is one person and an unreasonable number of tests. It has no telemetry, so the download chart above is genuinely everything we can see. If this tool kept your cache warm or your context alive today:
+
+- a star on this repo helps the next person find it
+- a rating on [Open VSX](https://open-vsx.org/extension/VedantShirgaonkar/lodestone) helps editor users trust it
+- anything broken, [tell us](https://github.com/VedantShirgaonkar/lodestone/issues) and it gets fixed with alarming speed
+
+That is the whole ask. Go build something.
 
 ## Contributing
 

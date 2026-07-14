@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.4] - 2026-07-14
+
+### Fixed
+
+- **"5h 107%" is no longer a thing any surface can display.** Claude Code's rate_limits feed can transiently report `used_percentage` above 100 right after a limit lands, and every surface repeated it with a straight face and a `live` tag. A window cannot be more than fully used: percentages are now rounded and clamped to [0, 100] at every normalization point (the bridge, the statusline's own payload path, the extension's cache reader, dash), while threshold logic keeps seeing the raw value.
+
+### Added
+
+- **A live download chart at the top of the README**, redrawn every six hours by a workflow from the two sources that actually exist: npm's official daily series (historical fact from first publish), and Open VSX's current total, which has no history endpoint and is therefore snapshotted into the repo on every run — the extension line grows one observed point at a time rather than pretending to a history nobody recorded. Zero dependencies, two SVGs (light and dark), live count badges beside it.
+- A short thanks section in the README and both listings: no telemetry means downloads are all we can see, so stars, ratings and bug reports are the entire feedback channel.
+
 ## [0.5.3] - 2026-07-14
 
 ### Fixed

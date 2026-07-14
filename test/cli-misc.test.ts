@@ -308,3 +308,33 @@ test("profile add: the new profile is wired immediately, hooks and skill include
   assert.match(doctorOut, /ok: hooks \(work\)/, doctorOut);
   assert.match(doctorOut, /ok: skill \/handoff \(work\)/, doctorOut);
 });
+
+test("statusline: a feed overshoot renders as 100%, never 107%", async () => {
+  const w = world();
+
+  // Claude Code's rate_limits can transiently report >100 right after a limit
+  // lands; a real render showed "5h 107%" tagged live on three surfaces at
+  // once. A window cannot be more than fully used.
+  const payload = JSON.stringify({
+    session_id: "s1",
+    workspace: { current_dir: w.projectRoot },
+    rate_limits: {
+      five_hour: { used_percentage: 107.3, resets_at: Math.floor(Date.now() / 1000) + 5400 },
+      seven_day: { used_percentage: 45, resets_at: Math.floor(Date.now() / 1000) + 200000 },
+    },
+  });
+  const { stdout, code } = await runCli(["statusline"], w.env, {
+    cwd: w.projectRoot,
+    stdin: payload,
+  });
+
+  assert.equal(code, 0);
+  assert.doesNotMatch(stdout, /10[1-9]%|1[1-9]\d%/, `no impossible percentage: ${stdout}`);
+  assert.match(stdout, /5h .*100%/, `clamps to the limit: ${stdout}`);
+
+  // And the bridge cache it wrote for every other surface is clamped too.
+  const cached = JSON.parse(
+    readFileSync(join(w.claudeDir, "lodestone", "usage-cache.json"), "utf8")
+  );
+  assert.equal(cached.five_hour.used_percentage, 100, "the cache must not propagate 107");
+});
