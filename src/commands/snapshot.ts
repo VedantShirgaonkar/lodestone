@@ -88,14 +88,19 @@ export async function snapshot(
     // Extract the snapshot
     const extracted = extractSnapshot(parsed, { gitInfo });
 
-    // Determine the project name for meta
-    const projectMeta = extracted.gitInfo.branch || "unknown";
-    const sourceSessionSlug = parsed.meta.slug || parsed.meta.sessionId || sessionId || "unknown";
+    // The munged project name, the same thing every other writer stores. This
+    // field used to be given the git branch, which is not a project and is
+    // already recorded in `branch` two lines below.
+    const projectMeta = mungeCwd(projectRoot);
+    // The real session id, never the slug. `sourceSession` is a resume target:
+    // `handoff --distill` hands it to `claude --resume`, and a friendly slug
+    // like "declarative-dancing-cat" resumes nothing.
+    const sourceSessionId = parsed.meta.sessionId || sessionId || "unknown";
 
     // Compose the handoff (unified render + quality score)
     const composed = composeHandoff(extracted, {
       sourceProfile: profileInfo.name,
-      sourceSession: sourceSessionSlug,
+      sourceSession: sourceSessionId,
       project: projectMeta,
       branch: extracted.gitInfo.branch,
       contextTokens: extracted.metrics.contextTokens,
@@ -121,7 +126,7 @@ export async function snapshot(
         const output: SnapshotOutput & { quality: number } = {
           path: outPath || join(projectRoot, ".claude/handoff/latest.md"),
           tokens: handoffTokens,
-          sessionId: sourceSessionSlug,
+          sessionId: sourceSessionId,
           contextTokens: extracted.metrics.contextTokens,
           created: meta.created,
           quality,
@@ -133,7 +138,7 @@ export async function snapshot(
           : `.claude/handoff/latest.md (~${handoffTokens} tokens)`;
         console.log(`snapshot: ${displayPath}`);
         console.log(
-          `~${handoffTokens} tokens · session ${sourceSessionSlug} · context ${extracted.metrics.contextTokens} tokens`
+          `~${handoffTokens} tokens · session ${sourceSessionId} · context ${extracted.metrics.contextTokens} tokens`
         );
         console.log(`handoff quality: ${quality}/5`);
         if (quality <= 2) {

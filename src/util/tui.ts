@@ -2,10 +2,104 @@ import { isatty } from "node:tty";
 import { stdout, stderr } from "node:process";
 import { createInterface } from "node:readline";
 
-const NO_COLOR = process.env.NO_COLOR;
-const isTTY = !NO_COLOR && isatty(stdout.fd);
+/**
+ * How much color this terminal can actually render: 24 (truecolor), 8 (256
+ * colors), 4 (16 colors), or 1 (none). Node works this out from TERM,
+ * COLORTERM, TERM_PROGRAM, the CI variables, FORCE_COLOR and NO_COLOR, which is
+ * a great deal more than we would get right by hand, and it re-reads the
+ * environment on every call.
+ *
+ * Getting this wrong is not a cosmetic miss. A terminal that cannot parse a
+ * truecolor escape does not ignore it. Apple's Terminal.app advertises
+ * TERM=xterm-256color, has never supported 24-bit color, and reads
+ * `ESC[38;2;124;108;186m` as a run of unrelated SGR codes, then paints the
+ * result. The banner used to emit exactly that sequence for every one of its
+ * 462 characters, so on the default macOS terminal it came out as noise.
+ */
+function colorDepth(): Depth {
+  if (!isatty(stdout.fd)) return 1;
+  const bits =
+    typeof stdout.getColorDepth === "function" ? stdout.getColorDepth() : 4;
+  return bits >= 24 ? 24 : bits >= 8 ? 8 : bits >= 4 ? 4 : 1;
+}
 
-/** LODESTONE banner, 77 cols wide, 6 rows */
+/**
+ * Whether we can run an interactive prompt. Deliberately independent of color:
+ * NO_COLOR asks us not to paint, not to stop asking questions. Gating the
+ * prompts on it meant `NO_COLOR=1 lodestone setup` silently accepted every
+ * default without ever showing the user a question.
+ */
+function canPrompt(): boolean {
+  return isatty(stdout.fd);
+}
+
+export type Depth = 1 | 4 | 8 | 24;
+
+type RGB = [number, number, number];
+
+/** The brand ramp: violet through to cyan. */
+const BRAND_FROM: RGB = [124, 108, 186];
+const BRAND_TO: RGB = [74, 214, 240];
+
+const RESET = "\x1b[0m";
+
+/** Plain cyan. Every terminal has had this one since the 1970s. */
+const FLAT = "\x1b[36m";
+
+function mix(from: RGB, to: RGB, t: number): RGB {
+  return [
+    Math.round(from[0] + (to[0] - from[0]) * t),
+    Math.round(from[1] + (to[1] - from[1]) * t),
+    Math.round(from[2] + (to[2] - from[2]) * t),
+  ];
+}
+
+/** The six values one channel of the xterm-256 color cube can take. */
+const CUBE = [0, 95, 135, 175, 215, 255];
+
+function nearestCube(v: number): number {
+  let best = 0;
+  for (let i = 1; i < CUBE.length; i++) {
+    if (Math.abs(CUBE[i]! - v) < Math.abs(CUBE[best]! - v)) best = i;
+  }
+  return best;
+}
+
+/** The foreground escape for one color, at the best fidelity this terminal has. */
+function fg([r, g, b]: RGB, depth: Depth): string {
+  if (depth >= 24) return `\x1b[38;2;${r};${g};${b}m`;
+  const cube = 16 + 36 * nearestCube(r) + 6 * nearestCube(g) + nearestCube(b);
+  return `\x1b[38;5;${cube}m`;
+}
+
+/**
+ * Paint text left to right along the brand ramp, at whatever fidelity the
+ * terminal has: a smooth gradient in truecolor, the same gradient quantized to
+ * the color cube at 256, and a flat cyan where only sixteen colors exist.
+ *
+ * An escape is emitted only where the color actually changes. At 256 colors
+ * neighbouring columns usually quantize to the same cube entry, so a line costs
+ * a handful of escapes instead of one per character.
+ */
+export function paint(text: string, depth: Depth): string {
+  if (depth === 1) return text;
+  if (depth === 4) return `${FLAT}${text}${RESET}`;
+
+  const span = Math.max(1, text.length - 1);
+  let out = "";
+  let last = "";
+  for (let col = 0; col < text.length; col++) {
+    const code = fg(mix(BRAND_FROM, BRAND_TO, col / span), depth);
+    if (code !== last) {
+      out += code;
+      last = code;
+    }
+    out += text[col];
+  }
+  return out + RESET;
+}
+
+/** LODESTONE in block capitals: 6 rows, 77 columns. */
 const BANNER_ART = [
   "██╗      ██████╗ ██████╗ ███████╗███████╗████████╗ ██████╗ ███╗   ██╗███████╗",
   "██║     ██╔═══██╗██╔══██╗██╔════╝██╔════╝╚══██╔══╝██╔═══██╗████╗  ██║██╔════╝",
@@ -15,39 +109,31 @@ const BANNER_ART = [
   "╚══════╝ ╚═════╝ ╚═════╝ ╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝╚══════╝",
 ];
 
-/** Gradient from violet (124,108,186) to cyan (74,214,240) across 77 columns */
-function columnGradient(col: number): [number, number, number] {
-  const cols = 77;
-  const t = col / (cols - 1);
+/** Stands in for the art when the window is too narrow to hold it. */
+const BANNER_COMPACT = "L O D E S T O N E";
 
-  const r = Math.round(124 + (74 - 124) * t);
-  const g = Math.round(108 + (214 - 108) * t);
-  const b = Math.round(186 + (240 - 186) * t);
+/** The same two-space gutter every step line below the banner uses. */
+const GUTTER = "  ";
 
-  return [r, g, b];
-}
+const BANNER_WIDTH = Math.max(...BANNER_ART.map((line) => line.length));
 
-function truecolor(r: number, g: number, b: number, text: string): string {
-  if (!isTTY) return text;
-  return `\x1b[38;2;${r};${g};${b}m${text}\x1b[0m`;
-}
+export function banner(
+  depth: Depth = colorDepth(),
+  columns: number = stdout.columns
+): string {
+  // A width of 0 is not a narrow terminal, it is a terminal that declined to
+  // answer, and some ptys answer exactly that. Treat anything falsy as unknown
+  // and assume the classic 80. Doing this in the body rather than as a default
+  // argument matters: a caller passing a literal 0 needs the same treatment,
+  // and a default only fires on `undefined`.
+  const width = columns || 80;
 
-export function banner(): string {
-  if (!isTTY) {
-    return BANNER_ART.map((l) => "  " + l).join("\n");
+  // Block art in a window too narrow for it wraps in the middle of an escape
+  // sequence and shreds itself. The wordmark always fits.
+  if (width < BANNER_WIDTH + GUTTER.length) {
+    return GUTTER + paint(BANNER_COMPACT, depth);
   }
-
-  return BANNER_ART.map((line) => {
-    const colored = line
-      .split("")
-      .map((char, col) => {
-        const [r, g, b] = columnGradient(col);
-        return truecolor(r, g, b, char);
-      })
-      .join("");
-    // Same two-space gutter as every step line printed below it.
-    return "  " + colored;
-  }).join("\n");
+  return BANNER_ART.map((line) => GUTTER + paint(line, depth)).join("\n");
 }
 
 /**
@@ -86,9 +172,10 @@ function stepSymbol(state: StepState): string {
 }
 
 function stepColor(state: StepState, text: string): string {
-  if (!isTTY) return text;
+  if (colorDepth() === 1) return text;
 
-  // Semantic colors from ADR-013
+  // Semantic colors from ADR-013. All sixteen-color codes, so every terminal
+  // that can show color at all can show these.
   const colors: Record<StepState, string> = {
     done: "\x1b[32m", // green
     active: "\x1b[36m", // cyan
@@ -97,7 +184,7 @@ function stepColor(state: StepState, text: string): string {
     fail: "\x1b[31m", // red
   };
 
-  return `${colors[state]}${text}\x1b[0m`;
+  return `${colors[state]}${text}${RESET}`;
 }
 
 export function step(
@@ -152,8 +239,7 @@ export async function confirm(
   question: string,
   defaultYes: boolean = true
 ): Promise<boolean> {
-  // If not a TTY, return the default immediately
-  if (!isTTY) {
+  if (!canPrompt()) {
     return defaultYes;
   }
 
@@ -189,8 +275,7 @@ export async function ask(
   question: string,
   defaultValue: string = ""
 ): Promise<string> {
-  // If not a TTY, return the default immediately
-  if (!isTTY) {
+  if (!canPrompt()) {
     return defaultValue;
   }
 
@@ -224,7 +309,7 @@ const SPINNER_FRAMES: string[] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦
 const SPINNER_INTERVAL_MS = 80;
 
 export function spinner(label: string): Spinner {
-  if (!isTTY) {
+  if (!canPrompt()) {
     console.log(label);
     return {
       stop: (_state: StepState, _detail?: string) => {
@@ -262,16 +347,8 @@ export function spinner(label: string): Spinner {
  * fills with every intermediate state and reads like a log, not a wizard.
  */
 export function eraseLines(n: number): void {
-  if (!isTTY || n <= 0) return;
+  if (!canPrompt() || n <= 0) return;
   process.stdout.write(`\x1b[${n}A\x1b[0J`);
-}
-
-/** How many terminal rows a printed line actually occupies. A long line wraps,
- *  and erasing without accounting for that eats the line above it. */
-function rowsFor(text: string): number {
-  const width = process.stdout.columns || 80;
-  const visible = text.replace(/\x1b\[[0-9;]*m/g, "").length;
-  return Math.max(1, Math.ceil(visible / width));
 }
 
 /**
@@ -284,21 +361,26 @@ export async function askStep(
   question: string,
   defaultYes: boolean
 ): Promise<boolean> {
-  if (!isTTY) return defaultYes;
-  const brand = "\x1b[38;2;124;108;186m";
-  const dim = "\x1b[2m";
-  const reset = "\x1b[0m";
+  if (!canPrompt()) return defaultYes;
   // No cursor games. Terminal wrap width cannot be known reliably (process
   // .stdout.columns disagrees with the pty), and an erase that miscounts eats
   // the line above it. The flow simply reads top to bottom, and the summary
   // panel at the end gives the clean checklist.
   console.log();
-  console.log(`  ${brand}${label}${reset}`);
-  console.log(`  ${dim}${explanation}${reset}`);
+  console.log(`  ${brandText(label)}`);
+  console.log(`  ${dimText(explanation)}`);
   return confirm(`  ${question}`, defaultYes);
+}
+
+/** The brand violet, degraded to whatever this terminal can show. */
+export function brandText(text: string): string {
+  const depth = colorDepth();
+  if (depth === 1) return text;
+  if (depth === 4) return `${FLAT}${text}${RESET}`;
+  return `${fg(BRAND_FROM, depth)}${text}${RESET}`;
 }
 
 /** Secondary text: present but not competing for attention. */
 export function dimText(text: string): string {
-  return isTTY ? `\x1b[2m${text}\x1b[0m` : text;
+  return colorDepth() > 1 ? `\x1b[2m${text}${RESET}` : text;
 }

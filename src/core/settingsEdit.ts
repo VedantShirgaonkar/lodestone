@@ -13,6 +13,56 @@ export interface SettingsConfig {
   [key: string]: unknown;
 }
 
+/** Every hook lodestone installs. The passive layer is exactly this list. */
+export const HOOK_EVENTS = [
+  "session-start",
+  "session-end",
+  "pre-compact",
+  "user-prompt-submit",
+] as const;
+
+export type HookEvent = (typeof HOOK_EVENTS)[number];
+
+/**
+ * Which of our hooks a settings file actually has registered.
+ *
+ * Doctor used to answer this with `raw.includes("lodestone hook")` and then
+ * print a hardcoded list of all four, so a profile carrying three hooks was
+ * reported as carrying four. The advisor was the missing one, and nothing in
+ * the codebase ever installed it, so the tool cheerfully certified a feature
+ * that had never once run. Report what is there.
+ */
+export function installedHooks(configDirOrSettingsPath: string): HookEvent[] {
+  const settingsPath = isSettingsPath(configDirOrSettingsPath)
+    ? configDirOrSettingsPath
+    : join(configDirOrSettingsPath, "settings.json");
+
+  if (!existsSync(settingsPath)) return [];
+
+  let settings: SettingsConfig;
+  try {
+    settings = JSON.parse(readFileSync(settingsPath, "utf8")) as SettingsConfig;
+  } catch {
+    return [];
+  }
+
+  const hooksObj = settings.hooks as Record<string, unknown> | undefined;
+  if (!hooksObj || typeof hooksObj !== "object") return [];
+
+  const found = new Set<string>();
+  for (const eventHooks of Object.values(hooksObj)) {
+    for (const { cmd } of hookCommandsOf(eventHooks)) {
+      for (const event of HOOK_EVENTS) {
+        // Matches however the command was spelled: the bare binary, an absolute
+        // path, or `node dist/cli.js` in a dev build.
+        if (cmd.includes(`hook ${event}`)) found.add(event);
+      }
+    }
+  }
+
+  return HOOK_EVENTS.filter((event) => found.has(event));
+}
+
 /**
  * Install hooks into a settings.json file.
  *
@@ -29,6 +79,7 @@ export function installHooks(
     sessionStartMatcher?: string;
     sessionEndCmd?: string;
     preCompactCmd?: string;
+    userPromptSubmitCmd?: string;
   }
 ): void {
   const settingsPath = isSettingsPath(configDirOrSettingsPath)
@@ -86,6 +137,20 @@ export function installHooks(
     const result = createOrUpdateHook(
       opts.preCompactCmd,
       "PreCompact",
+      hooksObj
+    );
+    if (result.changed) {
+      changed = true;
+    }
+  }
+
+  // UserPromptSubmit: the advisor, and trail mode's staleness reminder. This
+  // was implemented in full and then never wired up by any code path, so the
+  // 85% nudge and the 95% recovery snapshot had never fired for anyone.
+  if (opts.userPromptSubmitCmd) {
+    const result = createOrUpdateHook(
+      opts.userPromptSubmitCmd,
+      "UserPromptSubmit",
       hooksObj
     );
     if (result.changed) {

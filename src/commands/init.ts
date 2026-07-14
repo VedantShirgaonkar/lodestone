@@ -64,6 +64,7 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
           sessionStartMatcher: "startup|clear",
           sessionEndCmd: `${hookCmd} session-end`,
           preCompactCmd: `${hookCmd} pre-compact`,
+          userPromptSubmitCmd: `${hookCmd} user-prompt-submit`,
         });
 
         console.log(`profile ${profileName}: hooks installed`);
@@ -145,6 +146,7 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
       sessionStartMatcher: "startup|clear",
       sessionEndCmd: `${hookCmd} session-end`,
       preCompactCmd: `${hookCmd} pre-compact`,
+      userPromptSubmitCmd: `${hookCmd} user-prompt-submit`,
     });
 
     console.log(`project settings: hooks installed`);

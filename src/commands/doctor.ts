@@ -6,6 +6,7 @@ import { claudePath, versionOf } from "../core/claudeCli.js";
 import { expandTilde, handoffDirFor, findProjectRoot } from "../core/paths.js";
 import { parseSession, latestSession } from "../core/transcript.js";
 import { adoptDefault } from "../core/profiles.js";
+import { installedHooks, HOOK_EVENTS } from "../core/settingsEdit.js";
 
 interface CommandOptions {
   json: boolean;
@@ -232,24 +233,24 @@ export async function doctor(
     try {
       const config = loadConfig();
       for (const [name, profileCfg] of Object.entries(config.profiles)) {
-        const settingsPath = join(expandTilde(profileCfg.configDir), "settings.json");
-        let installed = false;
-        if (existsSync(settingsPath)) {
-          try {
-            const raw = readFileSync(settingsPath, "utf8");
-            installed = raw.includes("lodestone hook");
-          } catch {
-            installed = false;
-          }
-        }
+        // Report the hooks that are actually registered, never a list of the
+        // ones we meant to register. This check used to be a substring test for
+        // "lodestone hook" that then printed all four names, so a profile
+        // missing the advisor was certified as having it.
+        const installed = installedHooks(expandTilde(profileCfg.configDir));
+        const missing = HOOK_EVENTS.filter((event) => !installed.includes(event));
+
         checks.push({
           name: `hooks (${name})`,
-          status: installed ? "ok" : "FAIL",
-          message: installed
-            ? "session-start, session-end, pre-compact, user-prompt-submit"
-            : "not installed - run: lodestone init",
+          status: missing.length === 0 ? "ok" : "FAIL",
+          message:
+            installed.length === 0
+              ? "not installed — run: lodestone init"
+              : missing.length > 0
+                ? `${installed.join(", ")} — missing: ${missing.join(", ")} — run: lodestone init`
+                : installed.join(", "),
         });
-        if (!installed) hasFailure = true;
+        if (missing.length > 0) hasFailure = true;
       }
     } catch {
       // config already reported above

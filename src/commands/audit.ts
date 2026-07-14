@@ -180,9 +180,20 @@ async function detectEvents(
   // Pairs with a real record. Detector B guesses at boundaries from session
   // timing, so it must stay quiet wherever we already have hard evidence.
   const explicitPairs = new Set<string>();
+  // A crossing has to be FROM a real account. Placeholders reach this field
+  // two ways: a handoff whose sidecar meta was lost, and auto snapshots written
+  // before the provenance fix, which stored the literal "auto". Reporting
+  // `auto → personal` would be inventing a crossing from an account that does
+  // not exist, so drop those records here rather than downstream: falling
+  // through without adding to explicitPairs leaves Detector B free to guess at
+  // the same boundary, which is the honest way to describe a guess.
+  const realProfiles = new Set(Object.keys(config.profiles));
   for (const [projectMunged, projectRoot] of projectRoots) {
     for (const meta of allHandoffMetas(projectRoot)) {
       if (!meta.consumed || !meta.consumedBy?.profile || !meta.sourceProfile) {
+        continue;
+      }
+      if (!realProfiles.has(meta.sourceProfile)) {
         continue;
       }
 

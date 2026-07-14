@@ -258,12 +258,23 @@ async function hookSessionEnd(input: unknown): Promise<number> {
     const gitInfo = captureGitInfo(projectRoot);
     const extracted = extractSnapshot(parsed, { gitInfo });
 
-    // Compose handoff
+    // Compose handoff.
+    //
+    // "auto" is where a snapshot is filed, not who wrote it. The origin is
+    // already carried by the directory the file lands in, and `audit` reads
+    // sourceProfile as the account a boundary was crossed FROM, so a literal
+    // here made it report crossings from an account that does not exist.
     const created = new Date().toISOString();
+    const acting = resolveActingProfile();
     const composed = composeHandoff(extracted, {
-      sourceProfile: "auto",
-      sourceSession: parsed.meta.slug || sessionId || "unknown",
-      project: parsed.meta.gitBranch || "unknown",
+      sourceProfile: acting?.name ?? "unknown",
+      // The hook payload's session_id is authoritative, and `sourceSession` is
+      // a resume target: `handoff --distill` hands it to `claude --resume`.
+      // `slug` is a display name and resumes nothing.
+      sourceSession: sessionId || parsed.meta.sessionId || "unknown",
+      // The munged project name. This field was being given the git branch,
+      // which is not a project and is already recorded in `branch` below.
+      project: mungeCwd(projectRoot),
       branch: extracted.gitInfo.branch || undefined,
       contextTokens: extracted.metrics.contextTokens,
       distilled: false,

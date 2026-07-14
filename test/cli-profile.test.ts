@@ -145,14 +145,22 @@ test("cli: doctor checks claude on PATH", async () => {
     // Write .claude.json with login info
     await writeFile(resolve(claudeDir, ".claude.json"), JSON.stringify({ oauthAccount: { emailAddress: "t@example.com", organizationName: "Test Org" } }));
 
-    // doctor now verifies our hooks are actually wired in; a profile without
-    // them is a real setup failure, so plant them for the all-green case.
+    // doctor verifies our hooks are actually wired in, so plant the whole set
+    // for the all-green case. Planting only SessionStart used to pass, because
+    // doctor tested for the substring "lodestone hook" and then printed all
+    // four names regardless — a profile with one hook was certified as having
+    // four. A partial install is a broken install, and the next test asserts so.
     await writeFile(
       resolve(claudeDir, "settings.json"),
       JSON.stringify({
         hooks: {
           SessionStart: [
             { matcher: "startup|clear", hooks: [{ type: "command", command: "lodestone hook session-start" }] },
+          ],
+          SessionEnd: [{ hooks: [{ type: "command", command: "lodestone hook session-end" }] }],
+          PreCompact: [{ hooks: [{ type: "command", command: "lodestone hook pre-compact" }] }],
+          UserPromptSubmit: [
+            { hooks: [{ type: "command", command: "lodestone hook user-prompt-submit" }] },
           ],
         },
       })

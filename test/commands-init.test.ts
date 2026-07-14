@@ -217,7 +217,12 @@ test("init: is idempotent, and stays idempotent under a custom hook command", as
         const settings = JSON.parse(
           readFileSync(join(projectDir, ".claude", "settings.json"), "utf8")
         );
-        for (const event of ["SessionStart", "SessionEnd", "PreCompact"]) {
+        for (const event of [
+          "SessionStart",
+          "SessionEnd",
+          "PreCompact",
+          "UserPromptSubmit",
+        ]) {
           assert.equal(
             hookCount(settings, event),
             1,

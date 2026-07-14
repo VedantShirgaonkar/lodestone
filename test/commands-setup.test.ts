@@ -3,7 +3,7 @@ import assert from "node:assert";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { banner, step, panel } from "../src/util/tui.js";
+import { banner, paint, step, panel } from "../src/util/tui.js";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
 const CLI = resolve(__testDir, "../..", "bin/lodestone.js");
@@ -50,38 +50,72 @@ test("setup: non-TTY run exits 0 and prints command list", async () => {
   );
 });
 
-test("tui-banner: renders without color when NO_COLOR is set", () => {
-  const original = process.env.NO_COLOR;
-  process.env.NO_COLOR = "1";
+test("tui-banner: emits no escape codes at all when the terminal has no color", () => {
+  const result = banner(1);
 
-  const result = banner();
-
-  delete process.env.NO_COLOR;
-  if (original !== undefined) {
-    process.env.NO_COLOR = original;
-  }
-
-  // Should not contain ANSI escape codes
-  assert(!result.includes("\x1b"), "banner should not contain ANSI codes with NO_COLOR");
-  // Banner contains box-drawing characters that visually form LODESTONE
-  assert(result.includes("██╗"), "banner should contain box drawing characters");
-  assert(result.length > 100, "banner should be substantial in length");
+  assert(!result.includes("\x1b"), "should contain no ANSI codes");
+  assert(result.includes("██╗"), "should still draw the block art");
 });
 
-test("tui-banner: renders with gradient when TTY", () => {
-  const original = process.env.NO_COLOR;
-  delete process.env.NO_COLOR;
+test("tui-banner: piped output is plain text", () => {
+  // Nothing here is a TTY, so the default depth resolves to 1. A CI log or a
+  // `lodestone setup | tee` must not be full of escape codes.
+  assert(!banner().includes("\x1b"), "piped banner should be plain");
+});
 
-  const result = banner();
+test("tui-banner: uses 256-color escapes, never truecolor, on a 256-color terminal", () => {
+  const result = banner(8);
 
-  if (original !== undefined) {
-    process.env.NO_COLOR = original;
-  }
+  // The regression that prompted this. Apple Terminal.app advertises
+  // xterm-256color and has never supported 24-bit color, but it does not ignore
+  // a truecolor escape: it reads `38;2;124;108;186` as a run of separate SGR
+  // codes and paints the result, which is why the banner rendered as noise.
+  assert(!result.includes("38;2;"), "must not emit a truecolor escape at 8-bit depth");
+  assert(result.includes("\x1b[38;5;"), "should emit 256-color escapes");
+});
 
-  // In TTY mode, should contain color codes (but we can't guarantee this in test env)
-  // At minimum, should be a string with content
-  assert(typeof result === "string", "banner should return a string");
-  assert(result.length > 0, "banner should not be empty");
+test("tui-banner: uses truecolor escapes only where the terminal has truecolor", () => {
+  const result = banner(24);
+
+  assert(result.includes("\x1b[38;2;"), "should emit truecolor escapes at 24-bit depth");
+  assert(!result.includes("38;5;"), "should not fall back to the color cube");
+});
+
+test("tui-banner: falls back to one flat color at 16 colors", () => {
+  const result = banner(4);
+
+  assert(result.includes("\x1b[36m"), "should paint flat cyan");
+  assert(!result.includes("38;"), "should emit no extended-color escape");
+  assert(result.includes("██╗"), "should still draw the block art");
+});
+
+test("tui-banner: swaps in the wordmark when the window is too narrow for the art", () => {
+  // The art is 77 columns and sits in a 2-column gutter. Any narrower and it
+  // wraps in the middle of an escape sequence and shreds itself.
+  const narrow = banner(1, 78);
+  assert(!narrow.includes("██╗"), "should not draw block art that cannot fit");
+  assert(narrow.includes("L O D E S T O N E"), "should draw the wordmark instead");
+
+  const wide = banner(1, 79);
+  assert(wide.includes("██╗"), "should draw the block art once it fits");
+});
+
+test("tui-banner: a terminal reporting zero columns still gets the art", () => {
+  // Some ptys answer 0 rather than declining to answer. Zero is not nullish, so
+  // a `??` default takes it at face value and hides the art on a terminal that
+  // had room for it all along.
+  assert(banner(1, 0).includes("██╗"), "zero columns means unknown, not narrow");
+});
+
+test("tui-paint: emits an escape only where the color changes", () => {
+  const text = "x".repeat(77);
+  const escapes = (paint(text, 8).match(/\x1b\[38;5;/g) ?? []).length;
+
+  // One escape per character would be 77 of them, roughly 9KB of ANSI for the
+  // six-row banner. Quantizing to the color cube collapses neighbouring columns
+  // onto the same entry, so the run-length encoding should cost far less.
+  assert(escapes > 1, "should still be a gradient, not a single flat color");
+  assert(escapes < 20, `expected a handful of escapes, got ${escapes}`);
 });
 
 test("tui-step: renders done state", () => {
@@ -132,9 +166,29 @@ test("tui-panel: handles empty lines array", () => {
   assert(result.includes("╭"), "should still have corners");
 });
 
-test("gradient-math: produces values in valid RGB range", () => {
-  // Test that the gradient function (used internally) produces valid RGB values
-  // We'll indirectly test this by checking that banner() doesn't throw
-  const result = banner();
-  assert(typeof result === "string", "banner should produce a string");
+test("tui-paint: every truecolor channel it emits is a valid byte", () => {
+  const channels = [...paint("█".repeat(77), 24).matchAll(/38;2;(\d+);(\d+);(\d+)m/g)];
+
+  assert(channels.length > 0, "should have emitted truecolor escapes");
+  for (const [, r, g, b] of channels) {
+    for (const v of [Number(r), Number(g), Number(b)]) {
+      assert(
+        Number.isInteger(v) && v >= 0 && v <= 255,
+        `channel out of range: ${v}`
+      );
+    }
+  }
+});
+
+test("tui-paint: every 256-color index it emits is inside the color cube", () => {
+  const indices = [...paint("█".repeat(77), 8).matchAll(/38;5;(\d+)m/g)].map((m) =>
+    Number(m[1])
+  );
+
+  assert(indices.length > 0, "should have emitted 256-color escapes");
+  for (const i of indices) {
+    // 16..231 is the 6x6x6 cube. Below it are the 16 system colors, above it
+    // the greyscale ramp, and an index outside 0..255 is simply invalid.
+    assert(i >= 16 && i <= 231, `index ${i} is outside the 6x6x6 color cube`);
+  }
 });

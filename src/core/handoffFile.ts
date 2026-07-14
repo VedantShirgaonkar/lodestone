@@ -394,11 +394,15 @@ export function markAutoConsumed(
     if (existsSync(metaFile)) {
       meta = JSON.parse(readFileSync(metaFile, "utf8")) as HandoffMeta;
     } else {
+      // No sidecar meta, so we genuinely do not know who wrote this or from
+      // which session. Say so. "auto" is the directory it sits in, not an
+      // account, and audit reads sourceProfile as the account a boundary was
+      // crossed FROM: naming a profile we did not observe invents a crossing.
       meta = {
         schema: 1,
         created: new Date().toISOString(),
-        sourceProfile: "auto",
-        sourceSession: "auto",
+        sourceProfile: "unknown",
+        sourceSession: "unknown",
         project: projectRoot,
         contextTokens: 0,
         distilled: false,
@@ -520,15 +524,16 @@ export function freshest(projectRoot: string): { markdown: string; meta: Handoff
         const markdown = readFileSync(filePath, "utf8");
         return { markdown, meta, origin: "auto", path: filePath };
       }
-      // No parseable meta: usable, but build a minimal one
+      // No parseable meta: the handoff is still usable, but its provenance is
+      // not. Record that honestly rather than naming a profile we never saw.
       const markdown = readFileSync(filePath, "utf8");
       return {
         markdown,
         meta: {
           schema: 1,
           created: new Date().toISOString(),
-          sourceProfile: "auto",
-          sourceSession: "auto",
+          sourceProfile: "unknown",
+          sourceSession: "unknown",
           project: projectRoot,
           contextTokens: 0,
           distilled: false,

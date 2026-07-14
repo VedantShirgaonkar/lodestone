@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-07-14
+
+**The advisor had never run. Neither had the hook tests that were supposed to prove it did.**
+
+### Fixed
+
+- **The advisor was never installed.** `hook user-prompt-submit` is implemented in full: the 85% nudge, the 95% recovery snapshot, trail mode's staleness reminder. Nothing in the codebase ever wired it into `settings.json`, and `installHooks` did not even accept the option. Every user who ran `lodestone init` got three hooks and a dead advisor. It is now installed with the rest. **Existing users must re-run `lodestone init` to get it.**
+- **`doctor` certified hooks it had not found.** It tested `settings.json` for the substring `lodestone hook` and, on a match, printed a hardcoded list of all four hook names. A profile carrying one hook was reported as carrying four, which is how the missing advisor stayed invisible. It now reports the hooks that are actually registered and fails, naming the missing ones, when the set is incomplete.
+- **Auto-snapshots recorded provenance that was wrong in three fields at once.** They stored `sourceProfile: "auto"` (the directory the file lands in, not an account), the session's display slug where the session id belongs, and the git branch in the `project` field. Each one broke something real: `audit` reported boundary crossings *from* an account named `auto` that does not exist; `handoff --distill` fed the slug to `claude --resume`, which resumes nothing; and every snapshot was filed under a project named after a branch. `snapshot` had the same two field bugs. Fixed at all three writers, and `audit` now drops any record whose source is not a profile it can actually see rather than inventing a crossing from it.
+- **The banner was unreadable on the default macOS terminal.** It emitted a 24-bit truecolor escape for each of its 462 characters. Apple's Terminal.app advertises `xterm-256color`, has never supported 24-bit color, and does not ignore an escape it cannot parse: it reads `38;2;124;108;186` as a run of separate SGR codes and paints the result. The TUI now asks the terminal what it supports and degrades honestly, with a smooth gradient at 24-bit, the same gradient quantized to the color cube at 256, and one flat color at 16. The wizard's question labels used the same escape and were equally affected. As a side effect the banner costs 929 bytes of ANSI instead of ~9,200.
+- **`NO_COLOR` silently disabled the setup wizard's questions.** Color capability and interactivity were the same flag, so `NO_COLOR=1 lodestone setup` accepted every default without ever asking. `NO_COLOR` means do not paint, not do not ask.
+- **The banner vanished on terminals that report a width of zero.** Some ptys answer `0` rather than declining to answer, and `columns ?? 80` takes that literally, because zero is not nullish.
+
+### Changed
+
+- **The hook test suite now invokes hooks.** Every test in it used to build a fixture, declare stdin "complex to mock", never call the hook, and assert that a file it had just written existed. Five green ticks over a passive layer that no test had ever executed, and three of the bugs above rode in underneath it. Hooks are now driven as child processes with the event payload on stdin, exactly as Claude Code drives them, and the suite covers injection, consumption, the age gate, the source gate, both snapshot events, and the rule that a hook can never fail a session.
+- `doctor` exits non-zero on a partial hook install. It previously reported such a profile as healthy.
+
 ## [0.2.1] - 2026-07-13
 
 **`audit` and `dash` were reporting nothing. Both are fixed, and the cause was the same in each.**

@@ -7,7 +7,7 @@ TypeScript, ESM, Node >= 20, **zero runtime dependencies** (dev-only: typescript
 ## Commands
 - `npm run build` : tsc to `dist/`
 - `npm test` : build + `node --test` (160 tests)
-- `npm run build --prefix vscode` : the extension (CommonJS, the VS Code host requires it)
+- `npm run compile --prefix vscode` : the extension (CommonJS, the VS Code host requires it)
 
 ## Source of truth (read before changing anything)
 - `docs/ARCHITECTURE.md` : component design and data contracts
@@ -31,3 +31,6 @@ TypeScript, ESM, Node >= 20, **zero runtime dependencies** (dev-only: typescript
 - **Transcript lines are not all timestamped.** They commonly open with `ai-title` and close with `summary` or `file-history-snapshot`, none of which carry a `timestamp`. Take the outermost lines that actually have one, or every staleness check downstream fails open.
 - **`latest.meta.json` is overwritten by the next handoff.** A consumption record that lives only there dies within the session. Archive it beside the handoff, or `audit` outlives its own evidence.
 - **Write tests against the real layout.** Twice now, tests were written to match a bug (a parser reading `usage` at the wrong nesting; an audit detector looking for handoffs in a directory that does not exist), so they passed while the feature was dead on real data. If a fixture describes a path or a shape, check it against a real `~/.claude` first.
+- **A test that does not invoke the thing it names is worse than no test.** The entire hook suite once built fixtures, declared stdin "complex to mock", never called a hook, and asserted that a file it had just written existed. Five green ticks over a passive layer that had never run. Three bugs shipped underneath it. If a test cannot fail, delete it. Prove a regression test red against the bug before you trust it green.
+- **Provenance fields are load-bearing, not decorative.** `sourceSession` is a resume target (`handoff --distill` feeds it to `claude --resume`), `sourceProfile` is the account `audit` reports a crossing *from*, and `project` is the munged root. Writing a display slug, a literal `"auto"`, or the git branch into them silently kills distill, fabricates crossings from accounts that do not exist, and files snapshots under a project named after a branch.
+- **Never emit a truecolor escape you have not earned.** A terminal that cannot parse `ESC[38;2;r;g;b` does not ignore it, it reads the parameters as separate SGR codes and paints the result. Apple Terminal advertises `xterm-256color` and has never supported 24-bit color. Ask `stdout.getColorDepth()` and degrade: gradient at 24-bit, the same gradient quantized to the color cube at 8-bit, one flat color at 4-bit.
