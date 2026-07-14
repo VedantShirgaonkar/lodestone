@@ -4,7 +4,29 @@
 
 <p align="center"><b>Live Claude Code usage, cache countdowns, and one click account switching, in your status bar.</b></p>
 
+<p align="center">
+  <a href="https://www.npmjs.com/package/lodestone-cli"><img src="https://img.shields.io/npm/v/lodestone-cli?color=7c6cba&label=lodestone-cli" alt="npm version"></a>
+  <a href="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml"><img src="https://github.com/VedantShirgaonkar/lodestone/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/VedantShirgaonkar/lodestone/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT"></a>
+  <img src="https://img.shields.io/badge/dependencies-0-brightgreen" alt="zero runtime dependencies">
+</p>
+
 <p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/screenshot-popover.png" width="820" alt="Lodestone quota panel"></p>
+
+> ### This extension is a thin client
+>
+> The **[`lodestone` CLI](https://www.npmjs.com/package/lodestone-cli)** is the engine: it reads your transcripts, writes the handoffs, and talks to Claude Code. The extension reads the same files and shells out to the same CLI, so there is exactly one brain.
+>
+> **Install the CLI first, or nothing here will have anything to show you:**
+>
+> ```bash
+> npm install -g lodestone-cli
+> lodestone setup
+> ```
+>
+> `setup` is a guided first run: it finds your Claude install, adopts your account, and asks before it changes anything. Every step verifies itself.
+>
+> **[View on npm →](https://www.npmjs.com/package/lodestone-cli)** · **[Source on GitHub →](https://github.com/VedantShirgaonkar/lodestone)**
 
 ---
 
@@ -13,15 +35,6 @@
 Claude Code stays affordable because Anthropic caches your conversation on their servers. Reads from that cache cost about a tenth of normal input, writes cost double, and the cache only lives for one hour. It dies whenever you switch accounts, come back to a cold session, resume after a limit reset, or let a session grow bloated. When it dies, your next turn re-sends the entire conversation at full price. At 150k tokens of context that single turn costs about twenty normal ones, which is how people lose 40 to 80 percent of a five hour window to one account switch.
 
 Lodestone shows you exactly where you stand, warns you before you fall off that cliff, and replaces the expensive replay with a small handoff file that a fresh session picks up automatically.
-
-This extension is the editor face of the **`lodestone` CLI**, which does the actual work. **Install the CLI first:**
-
-```bash
-npm install -g lodestone-cli
-lodestone init
-lodestone init --statusline
-lodestone config set realUsage on
-```
 
 Works in **Cursor, Windsurf, Devin Desktop, VSCodium, Google Antigravity, AWS Kiro, Gitpod, Eclipse Theia**, and other editors that install from the Open VSX Registry.
 
@@ -53,6 +66,10 @@ Always visible: which Claude account you are on, your five hour usage, your week
 | **Enable real usage data** | Lets the CLI read your own token locally and fetch your true quota from Anthropic | Turn this on. Without it, the numbers are estimates and estimates lag behind |
 
 ### And in the terminal, from the same tool
+
+One guided command sets the whole thing up, and every step verifies itself rather than assuming it worked:
+
+<p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/screenshot-setup.png" width="760" alt="lodestone setup"></p>
 
 The CLI adds a live status line to every Claude Code session:
 

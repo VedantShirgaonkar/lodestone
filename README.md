@@ -55,7 +55,7 @@ The companion extension puts it in your status bar, with a panel on hover and on
 
 <p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/screenshot-popover.png" width="800" alt="Lodestone quota panel"></p>
 
-It is published on the **Open VSX Registry**, so it installs straight from the Extensions panel in **Cursor, Windsurf, Devin Desktop, VSCodium, Google Antigravity, AWS Kiro, Gitpod, Eclipse Theia**, and other editors built on the VS Code extension model. Search for **Lodestone**.
+It is published on the [**Open VSX Registry**](https://open-vsx.org/extension/VedantShirgaonkar/lodestone), so it installs straight from the Extensions panel in **Cursor, Windsurf, Devin Desktop, VSCodium, Google Antigravity, AWS Kiro, Gitpod, Eclipse Theia**, and other editors built on the VS Code extension model. Search for **Lodestone**.
 
 <p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/screenshot-actions.png" width="620" alt="Lodestone actions menu"></p>
 
@@ -79,6 +79,8 @@ Reads your own transcripts and reports every boundary you crossed, what it actua
 npm install -g lodestone-cli
 lodestone setup
 ```
+
+<p align="center"><img src="https://raw.githubusercontent.com/VedantShirgaonkar/lodestone/main/assets/screenshot-setup.png" width="760" alt="lodestone setup"></p>
 
 `setup` is a guided first run. It finds your Claude install, adopts your existing account, and asks before it changes anything: hooks, the live status line, real quota data, a second account, trail mode. Every step verifies itself, so when it says real usage is on, it has already fetched your real numbers and printed them.
 

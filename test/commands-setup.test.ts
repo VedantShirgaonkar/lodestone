@@ -167,6 +167,48 @@ test("tui-panel: handles empty lines array", () => {
   assert(result.includes("╭"), "should still have corners");
 });
 
+/** Visible width of a rendered row, ignoring color. */
+const widthsOf = (box: string): number[] =>
+  box.split("\n").map((l) => l.replace(/\x1b\[[0-9;]*m/g, "").length);
+
+test("tui-panel: every row is exactly as wide as its border", () => {
+  // The closing panel of `lodestone setup`, which is where this showed up: the
+  // right edge came apart into a column of stray bars at varying offsets. The
+  // frame was sized at contentWidth + 2 while a row renders at contentWidth + 4,
+  // so every row was a column wider than the border above it. The tests above
+  // only ever asserted that the text and the corners appeared *somewhere*, which
+  // a ragged box does perfectly well.
+  const box = panel("One thing left", [
+    "Restart your Claude Code session.",
+    "The status line and hooks load when a session starts.",
+  ]);
+
+  const widths = widthsOf(box);
+  assert.equal(
+    new Set(widths).size,
+    1,
+    `box is ragged: rows are ${widths.join(", ")} columns wide`
+  );
+});
+
+test("tui-panel: a line too wide for the terminal is truncated, not allowed to break the box", () => {
+  const box = panel("Title", ["x".repeat(200)], 40);
+
+  const widths = widthsOf(box);
+  assert.equal(new Set(widths).size, 1, "must stay square");
+  assert.ok(widths[0]! <= 40, `must fit in 40 columns, got ${widths[0]}`);
+  assert.ok(box.includes("…"), "and must say that it truncated");
+});
+
+test("tui-panel: a colored line is measured by what it shows, not what it stores", () => {
+  // An escape sequence occupies no columns. Padding by raw string length would
+  // pull the right border in by however many bytes of ANSI the line carried.
+  const box = panel("Title", ["\x1b[32mgreen\x1b[0m", "plain"]);
+
+  const widths = widthsOf(box);
+  assert.equal(new Set(widths).size, 1, `color skewed the box: ${widths.join(", ")}`);
+});
+
 test("tui-paint: every truecolor channel it emits is a valid byte", () => {
   const channels = [...paint("█".repeat(77), 24).matchAll(/38;2;(\d+);(\d+);(\d+)m/g)];
 

@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-07-14
+
+### Fixed
+
+- **The setup wizard's closing panel drew a broken box.** A row of the panel is `│` + space + content + space + `│`, four columns wider than its content, but the frame was sized at two, so every row rendered one column wider than the border above it and the right edge came apart into a column of stray bars. The frame also clamped itself to 80 columns without clamping the content to match, so a long line pushed its row out even further. Every row is now built from one shared content width, and content that cannot fit is truncated with an ellipsis rather than allowed to break the box. The panel tests previously asserted only that the title and the corner characters appeared somewhere, which a ragged box satisfies; they now assert every row is exactly as wide as the border.
+
 ## [0.3.1] - 2026-07-14
 
 **The setup wizard never listened to a single answer.**

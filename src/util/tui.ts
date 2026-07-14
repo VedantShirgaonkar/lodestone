@@ -204,30 +204,47 @@ export function step(
   return `  ${colored} ${label}`;
 }
 
-export function panel(title: string, lines: string[]): string {
-  // Compute width: max of title or any line, with padding
-  const titleLen = stripAnsi(title).length;
-  const lineLengths = lines.map((l) => stripAnsi(l).length);
-  const maxLineLen = lineLengths.length > 0 ? Math.max(...lineLengths) : 0;
-  const contentWidth = Math.max(titleLen, maxLineLen);
-  const width = contentWidth + 2; // padding left/right
+/**
+ * A boxed summary.
+ *
+ * A row is `│` + space + content + space + `│`, so it occupies four columns more
+ * than its content. The old version sized the frame at `contentWidth + 2` and
+ * then padded each row to a *different* width again, so every row came out one
+ * column wider than the border above it, and a row longer than the frame came
+ * out two wider. The box's right edge came apart into a column of stray bars at
+ * varying offsets. It clamped the frame to 80 columns without clamping the
+ * content to match, which turned a long line into exactly that.
+ *
+ * Every row here is built from the same content width, so they cannot disagree.
+ */
+export function panel(
+  title: string,
+  lines: string[],
+  columns: number = stdout.columns || 80
+): string {
+  const visible = (s: string): number => stripAnsi(s).length;
 
-  // Don't exceed terminal width (assume 80)
-  const effectiveWidth = Math.min(width, 80);
+  // Content that cannot fit is truncated, never allowed to push the border out.
+  const budget = Math.max(8, columns - 4);
+  const fit = (s: string): string =>
+    visible(s) <= budget ? s : stripAnsi(s).slice(0, budget - 1) + "…";
 
-  const topLine = "╭" + "─".repeat(effectiveWidth - 2) + "╮";
-  const bottomLine = "╰" + "─".repeat(effectiveWidth - 2) + "╯";
+  const head = fit(title);
+  const body = lines.map(fit);
+  const contentWidth = Math.max(visible(head), 0, ...body.map(visible));
 
-  const titleLine = `│ ${title.padEnd(effectiveWidth - 3)} │`;
-  const divider = "├" + "─".repeat(effectiveWidth - 2) + "┤";
+  const rule = (left: string, right: string): string =>
+    left + "─".repeat(contentWidth + 2) + right;
+  const row = (s: string): string =>
+    `│ ${s}${" ".repeat(contentWidth - visible(s))} │`;
 
-  const contentLines = lines.map((line) => {
-    const stripped = stripAnsi(line);
-    const padding = effectiveWidth - stripped.length - 3;
-    return `│ ${line}${" ".repeat(Math.max(0, padding))} │`;
-  });
-
-  return [topLine, titleLine, divider, ...contentLines, bottomLine].join("\n");
+  return [
+    rule("╭", "╮"),
+    row(head),
+    rule("├", "┤"),
+    ...body.map(row),
+    rule("╰", "╯"),
+  ].join("\n");
 }
 
 /** Strip ANSI codes for length calculation */
