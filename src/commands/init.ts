@@ -6,6 +6,7 @@ import { homedir } from "node:os";
 import { loadConfig } from "../core/config.js";
 import { findProjectRoot } from "../core/paths.js";
 import { installHooks } from "../core/settingsEdit.js";
+import { adoptDefault } from "../core/profiles.js";
 
 interface CommandOptions {
   json: boolean;
@@ -46,7 +47,22 @@ export async function init(args: string[], opts: CommandOptions): Promise<number
  */
 async function initUser(isStatusline: boolean, force: boolean): Promise<number> {
   try {
+    // Adopt ~/.claude before reading the registry. On a fresh machine nothing
+    // has registered a profile yet, so without this the loop below iterates
+    // over an empty object and `lodestone init` — the exact command the
+    // non-interactive setup tells a new user to run — installs nothing,
+    // prints nothing, and exits 0.
+    adoptDefault();
     const config = loadConfig();
+
+    if (Object.keys(config.profiles).length === 0) {
+      console.error(
+        "lodestone init: no Claude profile found — nothing to install into.\n" +
+          "  Is Claude Code installed? Its config dir (~/.claude) is adopted automatically.\n" +
+          "  Or register one explicitly: lodestone profile add <name>"
+      );
+      return 1;
+    }
 
     // Get the hook command (allow override via env for testing)
     const hookCmd = process.env.LODESTONE_HOOK_CMD || "lodestone hook";
