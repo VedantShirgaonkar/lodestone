@@ -756,3 +756,26 @@ test("loadProfileQuota: reads epoch-seconds resets from the bridge", () => {
   assert.strictEqual(q.fiveHourResetsAt, resetsAt);
   assert.ok(q.sevenDayResetsAt);
 });
+
+/**
+ * Test: cacheWarmth for a workspace path containing a space.
+ * Claude Code munges every non-alphanumeric to a dash, not just slashes; the
+ * old slash-only munge here meant such workspaces read "cold" forever.
+ */
+test("cacheWarmth: a path with a space finds its transcripts", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  const projectDir = "/Users/test/My Project";
+
+  // What Claude Code actually creates on disk for that path.
+  const mungedOnDisk = "-Users-test-My-Project";
+  const projectsDir = join(tmpDir, "projects", mungedOnDisk);
+  mkdirSync(projectsDir, { recursive: true });
+  writeFileSync(join(projectsDir, "sess-1.jsonl"), '{"type":"user"}\n');
+
+  const result = cacheWarmth(tmpDir, projectDir);
+  assert.ok(result);
+  assert.ok(
+    typeof result.minutesRemaining === "number",
+    `space-path workspace must be found, got: ${String(result.minutesRemaining)}`
+  );
+});

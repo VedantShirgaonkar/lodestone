@@ -366,3 +366,92 @@ test("hook session-end: exits 0 when the transcript is missing", async () => {
 
   assert.equal(code, 0, "a missing transcript is not the user's problem");
 });
+
+// ── user-prompt-submit: the advisor ─────────────────────────────────────────
+
+test("hook user-prompt-submit: warns when the 5h window crosses the threshold", async () => {
+  const w = world();
+
+  // The advisor reads quota from the statusline bridge. Plant a fresh bridge
+  // entry over the default 85% threshold.
+  const bridgeDir = join(w.env.CLAUDE_CONFIG_DIR!, "lodestone");
+  mkdirSync(bridgeDir, { recursive: true });
+  writeFileSync(
+    join(bridgeDir, "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "statusline",
+      five_hour: { used_percentage: 87, resets_at_ts: Math.floor(Date.now() / 1000) + 3600 },
+    }),
+    "utf8"
+  );
+
+  const { stdout, code } = await runHook(
+    "user-prompt-submit",
+    { session_id: "s1", cwd: w.projectRoot, transcript_path: w.transcript },
+    w.env
+  );
+
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout.trim()) as {
+    hookSpecificOutput: { hookEventName: string; additionalContext: string };
+    systemMessage?: string;
+  };
+  assert.equal(out.hookSpecificOutput.hookEventName, "UserPromptSubmit");
+  assert.match(out.systemMessage ?? "", /5h window at 87%/, "the user must see the warning");
+  assert.match(out.systemMessage ?? "", /cache is warm/);
+});
+
+test("hook user-prompt-submit: stays silent below the thresholds", async () => {
+  const w = world();
+  const bridgeDir = join(w.env.CLAUDE_CONFIG_DIR!, "lodestone");
+  mkdirSync(bridgeDir, { recursive: true });
+  writeFileSync(
+    join(bridgeDir, "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "statusline",
+      five_hour: { used_percentage: 30 },
+      seven_day: { used_percentage: 40 },
+    }),
+    "utf8"
+  );
+
+  const { stdout, code } = await runHook(
+    "user-prompt-submit",
+    { session_id: "s1", cwd: w.projectRoot, transcript_path: w.transcript },
+    w.env
+  );
+
+  assert.equal(code, 0);
+  assert.equal(stdout.trim(), "", "a healthy quota must inject nothing");
+});
+
+test("hook user-prompt-submit: banks a recovery snapshot at the critical threshold", async () => {
+  const w = world();
+  const bridgeDir = join(w.env.CLAUDE_CONFIG_DIR!, "lodestone");
+  mkdirSync(bridgeDir, { recursive: true });
+  writeFileSync(
+    join(bridgeDir, "usage-cache.json"),
+    JSON.stringify({
+      fetchedAt: Date.now(),
+      source: "statusline",
+      five_hour: { used_percentage: 97 },
+    }),
+    "utf8"
+  );
+
+  const { stdout, code } = await runHook(
+    "user-prompt-submit",
+    { session_id: SESSION_ID, cwd: w.projectRoot, transcript_path: w.transcript },
+    w.env
+  );
+
+  assert.equal(code, 0);
+  const out = JSON.parse(stdout.trim()) as { systemMessage?: string };
+  assert.match(out.systemMessage ?? "", /snapshot saved/, "the wall message must confirm the bank");
+  assert.ok(
+    existsSync(join(w.handoffDir, "auto", `${SESSION_ID}.md`)),
+    "the recovery snapshot must actually exist on disk"
+  );
+});

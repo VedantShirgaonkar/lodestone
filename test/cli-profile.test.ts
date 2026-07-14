@@ -166,6 +166,11 @@ test("cli: doctor checks claude on PATH", async () => {
       })
     );
 
+    // doctor also verifies the /handoff skill is installed per profile —
+    // another thing it used to certify without looking.
+    await mkdir(resolve(claudeDir, "skills/handoff"), { recursive: true });
+    await writeFile(resolve(claudeDir, "skills/handoff/SKILL.md"), "# /handoff\n");
+
     const configPath = resolve(testHome, ".config/lodestone/config.json");
     await writeFile(configPath, JSON.stringify({ schema: 1, profiles: { personal: { configDir: claudeDir } }, settings: {} }));
 

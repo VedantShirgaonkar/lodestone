@@ -413,6 +413,21 @@ export function latestSession(
 }
 
 /**
+ * Find a specific session by id for a working directory in a config directory.
+ * The one shared implementation: handoff.ts used to carry its own copy built
+ * on require(), which does not exist in an ES module, so the --session flag
+ * threw the moment it was combined with --distill.
+ */
+export function findSessionById(
+  configDir: string,
+  cwd: string,
+  sessionId: string
+): string | undefined {
+  const file = join(projectsDirFor(configDir), mungeCwd(cwd), `${sessionId}.jsonl`);
+  return existsSync(file) ? file : undefined;
+}
+
+/**
  * Extract the context tokens from a usage entry.
  * = input + cache_read + cache_creation
  */

@@ -6,6 +6,7 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
+import { mungeCwd } from "../src/core/paths.js";
 
 // Statusline reads stdin, so it must be exercised as a real child process:
 // in-process calls would listen on the test runner's never-ending stdin.
@@ -257,8 +258,12 @@ test("statusline: cache segment with fresh session mtime", async () => {
 
   // The workspace cwd we'll pass
   const workspaceCwd = resolve(testHome, "my-project");
-  // Munge it: split by "/" and join by "-"
-  const mungedCwd = workspaceCwd.split("/").join("-");
+  // Munge with the real rule (every non-alphanumeric becomes a dash) — the
+  // inline split("/").join("-") these tests used was the exact bug that made
+  // every space- or dot-containing project invisible to the CLI, and tmpdir
+  // paths on macOS contain dots, so the old inline munge builds a directory
+  // the statusline will now (correctly) never look in.
+  const mungedCwd = mungeCwd(workspaceCwd);
   const projectPath = resolve(projectsDir, mungedCwd);
 
   await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
@@ -307,8 +312,12 @@ test("statusline: cache segment shows cold when session is old", async () => {
 
   // The workspace cwd we'll pass
   const workspaceCwd = resolve(testHome, "my-old-project");
-  // Munge it: split by "/" and join by "-"
-  const mungedCwd = workspaceCwd.split("/").join("-");
+  // Munge with the real rule (every non-alphanumeric becomes a dash) — the
+  // inline split("/").join("-") these tests used was the exact bug that made
+  // every space- or dot-containing project invisible to the CLI, and tmpdir
+  // paths on macOS contain dots, so the old inline munge builds a directory
+  // the statusline will now (correctly) never look in.
+  const mungedCwd = mungeCwd(workspaceCwd);
   const projectPath = resolve(projectsDir, mungedCwd);
 
   await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });

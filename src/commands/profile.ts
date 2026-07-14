@@ -172,6 +172,15 @@ async function profileRename(args: string[]): Promise<number> {
       return 1;
     }
 
+    // Renaming onto an existing name would silently drop that profile's
+    // registration.
+    if (config.profiles[newName]) {
+      console.error(
+        `lodestone profile rename: profile already exists: ${newName}`
+      );
+      return 1;
+    }
+
     config.profiles[newName] = config.profiles[oldName];
     delete config.profiles[oldName];
 

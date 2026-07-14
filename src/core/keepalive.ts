@@ -1,11 +1,10 @@
-import { spawn, spawnSync } from "node:child_process";
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from "node:fs";
+import { spawn } from "node:child_process";
+import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from "node:fs";
 import { join, dirname } from "node:path";
-import { expandTilde, findProjectRoot } from "./paths.js";
-import { latestSession, latestContextTokens } from "./transcript.js";
+import { fileURLToPath } from "node:url";
+import { lodestoneConfigPath } from "./paths.js";
 import { loadConfig } from "./config.js";
 import { getQuota } from "./realUsage.js";
-import { weightedBurn } from "./usage.js";
 
 export interface KeepaliveState {
   pid?: number;
@@ -21,10 +20,31 @@ export interface KeepaliveState {
 }
 
 /**
+ * Where keepalive state lives: beside the lodestone config. Derived from
+ * lodestoneConfigPath() so it honors XDG_CONFIG_HOME and works where HOME does
+ * not exist (Windows), instead of hardcoding `$HOME/.config` as it used to.
+ */
+export function keepaliveStateDir(): string {
+  return dirname(lodestoneConfigPath());
+}
+
+/**
  * Get keepalive pidfile path for a profile
  */
-export function keepalivePidfilePath(homeDir: string, profile: string): string {
-  return join(homeDir, ".config", "lodestone", `keepalive-${profile}.json`);
+export function keepalivePidfilePath(profile: string): string {
+  return join(keepaliveStateDir(), `keepalive-${profile}.json`);
+}
+
+/** Is a recorded scheduler pid actually alive? Signal 0 probes without killing. */
+export function pidAlive(pid: number | undefined): boolean {
+  if (!pid || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (err) {
+    // EPERM means it exists but belongs to someone else; still alive.
+    return (err as NodeJS.ErrnoException).code === "EPERM";
+  }
 }
 
 /**
@@ -72,11 +92,8 @@ export function computePingSchedule(
 /**
  * Read active keepalive state for a profile
  */
-export function readKeepaliveState(
-  homeDir: string,
-  profile: string
-): KeepaliveState | null {
-  const pidfile = keepalivePidfilePath(homeDir, profile);
+export function readKeepaliveState(profile: string): KeepaliveState | null {
+  const pidfile = keepalivePidfilePath(profile);
   if (!existsSync(pidfile)) {
     return null;
   }
@@ -93,11 +110,10 @@ export function readKeepaliveState(
  * Write keepalive state file
  */
 export function writeKeepaliveState(
-  homeDir: string,
   profile: string,
   state: KeepaliveState
 ): void {
-  const pidfile = keepalivePidfilePath(homeDir, profile);
+  const pidfile = keepalivePidfilePath(profile);
   const dir = dirname(pidfile);
 
   mkdirSync(dir, { recursive: true });
@@ -105,31 +121,45 @@ export function writeKeepaliveState(
 }
 
 /**
- * Spawn detached keepalive scheduler child process
+ * Spawn the detached keepalive scheduler.
+ *
+ * Throws when the scheduler file is missing rather than spawning into the
+ * void. The old version spawned first and asked questions never: the file it
+ * pointed at had not been written, the detached child died silently on
+ * MODULE_NOT_FOUND, and the command reported "Keepalive started" with a pid
+ * that was already dead. A feature must not be able to report success without
+ * its own executable existing.
  */
 export function spawnKeepaliveScheduler(
   profile: string,
   sessionId: string,
-  contextTokens: number,
   durationMs: number,
   maxPings: number,
   schedule: ReturnType<typeof computePingSchedule>
 ): number {
-  // Spawn a detached child that runs the scheduler
-  // The child will manage pings and state file updates
-  const nodeArgs = [join(import.meta.url.replace("file://", ""), "..", "..", "keepalive-scheduler.js")];
+  // Compiled layout: this file is dist/core/keepalive.js, the scheduler is
+  // dist/keepalive-scheduler.js. fileURLToPath, never a string-replace on the
+  // URL: %20-encoded paths and Windows drive letters both break the naive way.
+  const schedulerPath = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "keepalive-scheduler.js"
+  );
+  if (!existsSync(schedulerPath)) {
+    throw new Error(`keepalive scheduler missing at ${schedulerPath} — reinstall lodestone-cli`);
+  }
 
   const env = {
     ...process.env,
     LODESTONE_KEEPALIVE_PROFILE: profile,
     LODESTONE_KEEPALIVE_SESSION_ID: sessionId,
-    LODESTONE_KEEPALIVE_CONTEXT_TOKENS: String(contextTokens),
     LODESTONE_KEEPALIVE_DURATION_MS: String(durationMs),
     LODESTONE_KEEPALIVE_MAX_PINGS: String(maxPings),
     LODESTONE_KEEPALIVE_INTERVAL_MS: String(schedule.pingIntervalMs),
+    LODESTONE_KEEPALIVE_STATE_FILE: keepalivePidfilePath(profile),
   };
 
-  const child = spawn(process.execPath, nodeArgs, {
+  const child = spawn(process.execPath, [schedulerPath], {
     detached: true,
     stdio: "ignore",
     env,
@@ -145,26 +175,35 @@ export function spawnKeepaliveScheduler(
  * Kill a running keepalive scheduler by profile
  */
 export function killKeepaliveScheduler(
-  homeDir: string,
   profile: string
 ): { killed: boolean; pid?: number } {
-  const state = readKeepaliveState(homeDir, profile);
+  const state = readKeepaliveState(profile);
   if (!state || !state.pid) {
     return { killed: false };
   }
 
   const pid = state.pid;
-  try {
-    process.kill(pid, "SIGTERM");
-    // Also remove the pidfile
-    const pidfile = keepalivePidfilePath(homeDir, profile);
-    if (existsSync(pidfile)) {
-      require("node:fs").unlinkSync(pidfile);
+  const pidfile = keepalivePidfilePath(profile);
+
+  // A dead scheduler still deserves its pidfile cleaned up, and killing a
+  // live one must report killed even if the file removal then fails. The old
+  // version called require("node:fs") here — this is an ES module, so the
+  // kill landed, the require threw, and the caller was told nothing died.
+  const wasAlive = pidAlive(pid);
+  if (wasAlive) {
+    try {
+      process.kill(pid, "SIGTERM");
+    } catch {
+      // raced with its own exit; treat as already gone
     }
-    return { killed: true, pid };
-  } catch {
-    return { killed: false, pid };
   }
+  try {
+    if (existsSync(pidfile)) unlinkSync(pidfile);
+  } catch {
+    // state file is advisory; the kill is what matters
+  }
+
+  return wasAlive ? { killed: true, pid } : { killed: false, pid };
 }
 
 /**

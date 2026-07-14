@@ -1,9 +1,8 @@
 import { join } from "node:path";
-import { existsSync, readdirSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { latestSession, parseSession } from "../core/transcript.js";
+import { latestSession, parseSession, findSessionById } from "../core/transcript.js";
 import { resolveActingProfile } from "../core/profiles.js";
-import { findProjectRoot, mungeCwd, projectsDirFor } from "../core/paths.js";
+import { findProjectRoot, mungeCwd } from "../core/paths.js";
 import { captureGitInfo, extractSnapshot } from "../core/extract.js";
 import { saveHandoff } from "../core/handoffFile.js";
 import { composeHandoff } from "../core/composeHandoff.js";
@@ -155,29 +154,3 @@ export async function snapshot(
   }
 }
 
-/**
- * Find a session by ID in a config directory, within the current project.
- */
-function findSessionById(
-  configDir: string,
-  cwd: string,
-  sessionId: string
-): string | undefined {
-  const munged = mungeCwd(cwd);
-  const projectsDir = projectsDirFor(configDir);
-  const projectDir = join(projectsDir, munged);
-
-  if (!existsSync(projectDir)) {
-    return undefined;
-  }
-
-  const files = readdirSync(projectDir);
-
-  for (const file of files) {
-    if (file === `${sessionId}.jsonl`) {
-      return join(projectDir, file);
-    }
-  }
-
-  return undefined;
-}

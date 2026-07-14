@@ -7,6 +7,7 @@ import { resolveActingProfile, adoptDefault } from "../core/profiles.js";
 import { latestSession, parseSession, latestContextTokens } from "../core/transcript.js";
 import { extractSnapshot, captureGitInfo } from "../core/extract.js";
 import { composeHandoff } from "../core/composeHandoff.js";
+import { handoff } from "./handoff.js";
 
 interface CommandOptions {
   json: boolean;
@@ -43,6 +44,23 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
       throw new Error("No active profile found. Set CLAUDE_CONFIG_DIR or run: lodestone profile add");
     }
 
+    // --distill delegates to the one real distillation path. This command used
+    // to accept the flag, skip the distillation entirely, and stamp
+    // `distilled: true` into the metadata anyway — false provenance that audit
+    // and the panels would then repeat as fact. handoff --distill snapshots,
+    // prints the cost estimate before spending (ADR-003), applies the
+    // cold-cache refusal, and marks the meta only when it actually distilled.
+    if (distill) {
+      const result = await handoff(["--distill"], opts);
+      if (result !== 0) {
+        return result;
+      }
+      console.log("Handoff saved. Next steps:");
+      console.log("1. In Claude Code, type: /clear");
+      console.log("2. The handoff will load automatically in your fresh session");
+      return 0;
+    }
+
     // Find the latest session
     const sessionPath = latestSession(profile.configDir, cwd);
     if (!sessionPath) {
@@ -63,14 +81,15 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
     // Compute project name from cwd (munged format)
     const project = mungeCwd(projectRoot);
 
-    // Compose handoff
+    // Compose handoff. distilled is a fact about how this markdown was made,
+    // and this path never distills.
     const composed = composeHandoff(extracted, {
       sourceProfile: profile.name,
       sourceSession: parsed.meta.sessionId || "unknown",
       project,
       branch: gitInfo.branch,
       contextTokens: latestContextTokens(parsed),
-      distilled: distill,
+      distilled: false,
     });
 
     // Save handoff

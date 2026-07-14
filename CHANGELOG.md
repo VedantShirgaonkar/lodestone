@@ -4,6 +4,30 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-07-14
+
+**A release-gate audit of every feature, run the way a new user would hit them. It found two features that had never existed and one bug that hid three of nine real projects.**
+
+### Fixed
+
+- **Project paths with spaces, dots or underscores were invisible to every active command.** Claude Code names transcript directories by replacing *every* character that is not ASCII alphanumeric or `-` with `-`; `mungeCwd` replaced only `/`. So for a project at `~/Desktop/RAIT QA`, session lookup resolved to a directory that does not exist, and `snapshot`, `handoff`, `refresh`, `switch`, `keepalive` and the statusline's cache segment all quietly reported no session — on the machine this was found on, in 3 of 9 real projects. The passive hooks were immune only because Claude Code hands them the transcript path directly. Fixed in the CLI and in the extension's cache-warmth lookup, verified against live `~/.claude/projects` entries, and the research doc that stated the wrong rule is corrected.
+- **`keepalive` never existed.** The command printed a credible plan, spawned Node against a scheduler file that had never been written, recorded the dead pid, and announced "Keepalive started". `--status` repeated the claim forever because it never asked the OS whether the pid was alive. The scheduler now exists (`dist/keepalive-scheduler.js`): it waits out each interval, re-checks the 80% guardrail before every ping, resumes the session with `--fork-session` so the ping renews the cache TTL without appending a junk turn to your real transcript, records each ping in the state file, and exits at the cap, the deadline, the guardrail, or `--stop`. `--status` now distinguishes a running scheduler from a finished or dead one. The whole lifecycle is covered by tests that count actual pings through a fake `claude` binary.
+- **`switch --keep-warm <duration>` now exists.** The README's feature table had documented it since the beginning; the command's strict parser rejected it with "Unknown option". It schedules keepalive on the profile you are leaving, then launches the target.
+- **The `/handoff` skill was never installed.** Only `init --project` copied it, per project; the documented path (`lodestone setup`, `lodestone init`) installed nothing, so the README, the wizard and the advisor all recommended a `/handoff` command that did not exist in anyone's session — including the author's. `init` now installs it into each profile's `skills/` dir, `doctor` verifies it by looking, and the copy reports failure instead of silently skipping. The path resolution also used a naive `file://` strip that broke on Windows and on any install path containing a space; it now uses `fileURLToPath`.
+- **`handoff --distill --session <id>` crashed on `require()`.** The command's private session lookup was built on `require()`, which does not exist in an ES module, so the flag combination died with "require is not defined". There is now one shared `findSessionById` in core, used everywhere.
+- **The statusline's estimate fallback fabricated a percentage.** With no live data it divided measured burn by an assumed 200k "pro" budget and printed `5h ≈N%` — the exact violation the project's hard rules exist to prevent, on the one surface still doing it. It now prints the measured weighted tokens labeled `est`, or nothing.
+- **`refresh --distill` stamped `distilled: true` without distilling.** It now delegates to the real distillation path, with its cost estimate and cold-cache refusal; the metadata only says distilled when it is.
+- **`switch --distill` hid the pre-spend cost estimate** by passing `--quiet` through to handoff. The estimate prints before anything spends, as ADR-003 requires.
+- **`keepalive` state moved off `$HOME/.config`** to the real lodestone config dir, so it honors `XDG_CONFIG_HOME` and does not require `HOME` to exist. Killing a scheduler also no longer mis-reports "nothing killed" after killing (another ES-module `require()`).
+- **`profile rename` refuses to overwrite an existing profile** instead of silently dropping its registration.
+- **A typo'd command explains itself** ("unknown command or profile", with both lookups) instead of falling through to the profile launcher's "profile not found: stauts".
+
+### Added
+
+- `--help` now lists `config`, `trail` and `refresh` — three commands the README pointed at that the CLI never mentioned — and `lodestone help <cmd>` exists for `init`, `config`, `trail`, `refresh` and documents `switch --keep-warm`.
+- `lodestone config get/set autoSnapshot` and `maxAgeDays`: the hooks always honored both settings; now something can set them.
+- The advisor hook has direct tests: the 85% warning, silence below thresholds, and the 95% recovery snapshot verified on disk. The keepalive lifecycle, the skill install, the munge rule, and the no-percentage statusline are all under test. 205 tests.
+
 ## [0.3.2] - 2026-07-14
 
 ### Fixed

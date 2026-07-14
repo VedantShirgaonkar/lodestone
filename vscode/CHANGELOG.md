@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.4
+
+- **Cache warmth now works for workspaces whose path contains a space, dot or underscore.** Claude Code names its transcript directories by replacing every non-alphanumeric character with a dash; the extension replaced only slashes, so such workspaces munged to a directory that does not exist and their cache read "cold" forever. Requires nothing from you beyond updating.
+- Pair with `lodestone-cli` 0.4.0, where the same munge bug (and more) is fixed in the CLI: the "Keep Current Account Warm" action now drives a scheduler that actually exists, and `lodestone init` installs the `/handoff` skill the panel's advice refers to.
+
 ## 0.1.3
 
 The extension's own code is unchanged. This release is about what sits underneath it, and what the listing says.

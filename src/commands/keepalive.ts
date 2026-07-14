@@ -12,13 +12,14 @@ import { loadConfig } from "../core/config.js";
 import { resolveActingProfile, adoptDefault } from "../core/profiles.js";
 import { versionOf } from "../core/claudeCli.js";
 import {
-  keepalivePidfilePath,
+  keepaliveStateDir,
   computePingSchedule,
   readKeepaliveState,
   writeKeepaliveState,
   spawnKeepaliveScheduler,
   killKeepaliveScheduler,
   isFiveHourLimitReached,
+  pidAlive,
 } from "../core/keepalive.js";
 
 interface CommandOptions {
@@ -52,22 +53,18 @@ export async function keepalive(
 
     adoptDefault();
     const config = loadConfig();
-    const homeDir = process.env.HOME || "";
-    if (!homeDir) {
-      throw new Error("HOME not set");
-    }
 
     const claudeVersion = await versionOf();
 
     // Handle --status
     if ((parsedOpts.status as boolean) ?? false) {
-      return handleStatus(homeDir, config);
+      return handleStatus();
     }
 
     // Handle --stop
     if ((parsedOpts.stop as boolean) ?? false) {
       const targetProfile = positionals[0];
-      return handleStop(homeDir, config, targetProfile);
+      return handleStop(config, targetProfile);
     }
 
     // Handle start keepalive
@@ -89,7 +86,6 @@ export async function keepalive(
     }
 
     return await handleStart(
-      homeDir,
       config,
       targetProfile,
       durationMs,
@@ -105,7 +101,6 @@ export async function keepalive(
 }
 
 async function handleStart(
-  homeDir: string,
   config: any,
   profile: string,
   durationMs: number,
@@ -176,17 +171,8 @@ async function handleStart(
   );
   console.log(`  Interval: every ${formatDuration(schedule.pingIntervalMs)}`);
 
-  // Spawn scheduler
-  const pid = spawnKeepaliveScheduler(
-    profile,
-    sessionId,
-    contextTokens,
-    durationMs,
-    maxPings,
-    schedule
-  );
-
-  // Write state file
+  // Write the state file FIRST, then spawn: the scheduler records each ping
+  // into this file, so it has to exist before the child can look for it.
   const state: {
     pid?: number;
     profile: string;
@@ -199,29 +185,34 @@ async function handleStart(
     until: number;
     created: number;
   } = {
-    pid,
     profile,
     sessionId,
     pings: [],
-    cap: maxPings,
+    cap: schedule.totalPingsToSchedule,
     until: Date.now() + durationMs,
     created: Date.now(),
   };
+  writeKeepaliveState(profile, state);
 
-  writeKeepaliveState(homeDir, profile, state);
+  const pid = spawnKeepaliveScheduler(
+    profile,
+    sessionId,
+    durationMs,
+    schedule.totalPingsToSchedule,
+    schedule
+  );
+
+  state.pid = pid;
+  writeKeepaliveState(profile, state);
 
   console.log(`Keepalive started (pid ${pid})`);
   return 0;
 }
 
-function handleStop(
-  homeDir: string,
-  config: any,
-  targetProfile?: string
-): number {
+function handleStop(config: any, targetProfile?: string): number {
   if (targetProfile) {
     // Stop a specific profile
-    const { killed, pid } = killKeepaliveScheduler(homeDir, targetProfile);
+    const { killed, pid } = killKeepaliveScheduler(targetProfile);
     if (killed) {
       console.log(`Stopped keepalive for ${targetProfile} (was pid ${pid})`);
     } else {
@@ -233,7 +224,7 @@ function handleStop(
   // Stop all
   let count = 0;
   for (const profileName of Object.keys(config.profiles)) {
-    const { killed } = killKeepaliveScheduler(homeDir, profileName);
+    const { killed } = killKeepaliveScheduler(profileName);
     if (killed) {
       count++;
     }
@@ -247,8 +238,8 @@ function handleStop(
   return 0;
 }
 
-function handleStatus(homeDir: string, _config: any): number {
-  const keepaliveDir = join(homeDir, ".config", "lodestone");
+function handleStatus(): number {
+  const keepaliveDir = keepaliveStateDir();
   if (!existsSync(keepaliveDir)) {
     console.log("No active keepalive schedulers");
     return 0;
@@ -267,11 +258,21 @@ function handleStatus(homeDir: string, _config: any): number {
   let found = false;
   for (const file of keepaliveFiles) {
     const profileName = file.replace("keepalive-", "").replace(".json", "");
-    const state = readKeepaliveState(homeDir, profileName);
-    if (state) {
-      found = true;
+    const state = readKeepaliveState(profileName);
+    if (!state) continue;
+    found = true;
+
+    // A pid in a file is a claim, not a fact. Status used to repeat the claim,
+    // which kept a scheduler that died on launch looking alive forever.
+    const alive = pidAlive(state.pid);
+    const untilStr = new Date(state.until).toISOString();
+    if (alive) {
       console.log(
-        `${state.profile}: ${state.pings.length}/${state.cap} pings (until ${new Date(state.until).toISOString()})`
+        `${state.profile}: running (pid ${state.pid}) — ${state.pings.length}/${state.cap} pings, until ${untilStr}`
+      );
+    } else {
+      console.log(
+        `${state.profile}: not running — ${state.pings.length}/${state.cap} ping(s) recorded before it ended`
       );
     }
   }

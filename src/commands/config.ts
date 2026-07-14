@@ -26,7 +26,8 @@ export async function config(args: string[], opts: CommandOptions): Promise<numb
     } else {
       console.error("lodestone config: usage: config get|set <key> [value]");
       console.error(
-        "  keys: realUsage, advisor.fiveHourPct, advisor.weeklyPct, plan"
+        "  keys: realUsage, autoSnapshot, maxAgeDays, advisor.fiveHourPct, advisor.weeklyPct,\n" +
+          "        advisor.criticalPct, advisor.trailStaleMinutes, keepalive.maxWindowPct, plan"
       );
       return 2;
     }
@@ -48,6 +49,10 @@ function configGet(key: string | undefined, opts: CommandOptions): number {
 
   if (key === "realUsage") {
     value = config.settings.realUsage ?? false;
+  } else if (key === "autoSnapshot") {
+    value = config.settings.autoSnapshot ?? true;
+  } else if (key === "maxAgeDays") {
+    value = config.settings.maxAgeDays ?? 7;
   } else if (key === "advisor.fiveHourPct") {
     value = config.settings.advisor?.fiveHourPct ?? 85;
   } else if (key === "advisor.weeklyPct") {
@@ -96,6 +101,26 @@ function configSet(key: string | undefined, value: string | undefined, opts: Com
         return 1;
       }
       config.settings.realUsage = truthy.includes(v);
+    } else if (key === "autoSnapshot") {
+      // The hooks honor this setting; until now nothing could set it short of
+      // hand-editing the JSON.
+      const v = value.trim().toLowerCase();
+      const truthy = ["on", "true", "yes", "1", "enable", "enabled"];
+      const falsy = ["off", "false", "no", "0", "disable", "disabled"];
+      if (!truthy.includes(v) && !falsy.includes(v)) {
+        console.error(
+          `lodestone config: autoSnapshot must be on or off (got "${value}")`
+        );
+        return 1;
+      }
+      config.settings.autoSnapshot = truthy.includes(v);
+    } else if (key === "maxAgeDays") {
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1) {
+        console.error("lodestone config: maxAgeDays must be ≥1");
+        return 1;
+      }
+      config.settings.maxAgeDays = numValue;
     } else if (key === "advisor.fiveHourPct") {
       const numValue = parseInt(value, 10);
       if (isNaN(numValue) || numValue < 0 || numValue > 100) {

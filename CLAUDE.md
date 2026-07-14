@@ -6,7 +6,7 @@ TypeScript, ESM, Node >= 20, **zero runtime dependencies** (dev-only: typescript
 
 ## Commands
 - `npm run build` : tsc to `dist/`
-- `npm test` : build + `node --test` (160 tests)
+- `npm test` : build + `node --test` (205 tests)
 - `npm run compile --prefix vscode` : the extension (CommonJS, the VS Code host requires it)
 
 ## Source of truth (read before changing anything)
@@ -28,6 +28,7 @@ TypeScript, ESM, Node >= 20, **zero runtime dependencies** (dev-only: typescript
 
 ## Things that have bitten us
 - **The munged project name is not reversible.** `~/.claude/projects/-Users-alex-code-my-app` could be `/Users/alex/code/my-app` or `/Users/alex/code/my/app`, and a directory with a space in it munges to a dash too. Get the real project root from the transcript's `cwd` field. `newestSessionIn(projectDir)` takes an already-resolved projects dir; `latestSession(configDir, cwd)` takes a working directory and munges it. Passing the former to the latter double-munges and silently resolves to nothing.
+- **The munge is every non-alphanumeric, not just `/`.** Claude Code replaces every character outside `[A-Za-z0-9-]` with `-` (spaces, dots, underscores, backslashes, non-ASCII; runs not collapsed). `mungeCwd` implemented only `/` → `-` for four releases, so every per-project command silently found no session in any path containing a space — 3 of 9 real projects on the author's own machine. The extension's `cacheWarmth` duplicated the bug. If you touch the munge, update `src/core/paths.ts` and `vscode/src/model.ts` together.
 - **Transcript lines are not all timestamped.** They commonly open with `ai-title` and close with `summary` or `file-history-snapshot`, none of which carry a `timestamp`. Take the outermost lines that actually have one, or every staleness check downstream fails open.
 - **`latest.meta.json` is overwritten by the next handoff.** A consumption record that lives only there dies within the session. Archive it beside the handoff, or `audit` outlives its own evidence.
 - **Write tests against the real layout.** Twice now, tests were written to match a bug (a parser reading `usage` at the wrong nesting; an audit detector looking for handoffs in a directory that does not exist), so they passed while the feature was dead on real data. If a fixture describes a path or a shape, check it against a real `~/.claude` first.

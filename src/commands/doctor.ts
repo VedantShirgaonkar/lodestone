@@ -251,6 +251,25 @@ export async function doctor(
                 : installed.join(", "),
         });
         if (missing.length > 0) hasFailure = true;
+
+        // The /handoff skill, checked the same way: by looking. The README,
+        // the wizard and the advisor all point users at /handoff, and for a
+        // while nothing installed it and nothing noticed.
+        const skillPath = join(
+          expandTilde(profileCfg.configDir),
+          "skills",
+          "handoff",
+          "SKILL.md"
+        );
+        const skillPresent = existsSync(skillPath);
+        checks.push({
+          name: `skill /handoff (${name})`,
+          status: skillPresent ? "ok" : "FAIL",
+          message: skillPresent
+            ? skillPath
+            : "not installed — run: lodestone init",
+        });
+        if (!skillPresent) hasFailure = true;
       }
     } catch {
       // config already reported above

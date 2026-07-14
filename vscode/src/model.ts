@@ -172,11 +172,15 @@ export function cacheWarmth(
   configDir: string,
   projectDir: string
 ): CacheWarmthData | null {
-  // Munge the project path: / → -
-  const munged = projectDir.replace(/\//g, "-");
-  const mungedPrivate = (
-    "/private" + projectDir
-  ).replace(/\//g, "-");
+  // Claude Code's munge replaces every character that is not ASCII
+  // alphanumeric or `-` with `-` (verified against real ~/.claude/projects
+  // entries; anthropics/claude-code#19972). Replacing only `/` meant any
+  // workspace with a space, dot or underscore in its path munged to a
+  // directory that does not exist, and its cache showed "cold" forever.
+  // Mirrors mungeCwd in the CLI's src/core/paths.ts — keep the two in step.
+  const mungeCwd = (p: string): string => p.replace(/[^A-Za-z0-9-]/g, "-");
+  const munged = mungeCwd(projectDir);
+  const mungedPrivate = mungeCwd("/private" + projectDir);
 
   const projectsBase = join(configDir, "projects");
   if (!existsSync(projectsBase)) {

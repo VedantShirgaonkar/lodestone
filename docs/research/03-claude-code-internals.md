@@ -14,7 +14,7 @@
 
 ## 2. Session transcripts (the raw material for snapshots)
 
-Location: `<config-dir>/projects/<munged-cwd>/<session-uuid>.jsonl` where `<munged-cwd>` is the working directory path with `/` → `-` (e.g. `-Users-rahul-Desktop-mem`). One JSON object per line. Observed line `type`s and counts from a real 1059-line session: `assistant` (489), `user` (315), `file-history-snapshot` (108), `attachment` (44), `mode`, `permission-mode`, `last-prompt`, `system`, `queue-operation`.
+Location: `<config-dir>/projects/<munged-cwd>/<session-uuid>.jsonl` where `<munged-cwd>` is the working directory path with **every character that is not ASCII alphanumeric or `-` replaced by `-`** (e.g. `-Users-rahul-Desktop-mem`; `/Users/rahul/Desktop/RAIT QA` → `-Users-rahul-Desktop-RAIT-QA`). Spaces, dots, underscores, backslashes and non-ASCII all become dashes; runs are not collapsed; existing hyphens survive. Verified against live entries and anthropics/claude-code#19972, #30828. An earlier version of this doc claimed the rule was `/` → `-` only; code written to that claim could not find sessions for 3 of 9 real projects on the machine it was tested on. One JSON object per line. Observed line `type`s and counts from a real 1059-line session: `assistant` (489), `user` (315), `file-history-snapshot` (108), `attachment` (44), `mode`, `permission-mode`, `last-prompt`, `system`, `queue-operation`.
 
 Key fields (observed v2.1.170–2.1.206):
 

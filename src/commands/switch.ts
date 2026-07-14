@@ -4,6 +4,7 @@ import { resolveActingProfile } from "../core/profiles.js";
 import { loadConfig } from "../core/config.js";
 import { findProjectRoot } from "../core/paths.js";
 import { handoff } from "./handoff.js";
+import { keepalive } from "./keepalive.js";
 import { launchInteractive } from "../core/claudeCli.js";
 import { loadLatestHandoff, estimateTokens } from "../core/handoffFile.js";
 import { switchTax } from "../core/usage.js";
@@ -36,6 +37,7 @@ export async function switchCmd(
         distill: { type: "boolean" },
         force: { type: "boolean" },
         stay: { type: "boolean" },
+        "keep-warm": { type: "string" },
       },
       allowPositionals: true,
       strict: true,
@@ -44,6 +46,7 @@ export async function switchCmd(
     const doDistill = (parsedOpts.distill as boolean) ?? false;
     const force = (parsedOpts.force as boolean) ?? false;
     const stay = (parsedOpts.stay as boolean) ?? false;
+    const keepWarm = (parsedOpts["keep-warm"] as string) ?? undefined;
     const targetProfileName = positionals[0] as string | undefined;
 
     if (!targetProfileName) {
@@ -108,7 +111,11 @@ export async function switchCmd(
       return 0;
     }
 
-    // Run handoff (snapshot ± distill)
+    // Run handoff (snapshot ± distill).
+    //
+    // --quiet only on the free path. Distilling spends real tokens, and the
+    // cost estimate handoff prints before it spends is the ADR-003 contract;
+    // passing --quiet here was silencing exactly that line.
     const handoffArgs: string[] = [];
     if (doDistill) {
       handoffArgs.push("--distill");
@@ -116,7 +123,11 @@ export async function switchCmd(
         handoffArgs.push("--force");
       }
     }
-    handoffArgs.push("--quiet");
+    // In --json mode, quiet regardless: switch emits the one JSON document,
+    // and a second one from handoff would corrupt the stream.
+    if (!doDistill || opts.json) {
+      handoffArgs.push("--quiet");
+    }
 
     const handoffResult = await handoff(handoffArgs, opts);
     if (handoffResult !== 0) {
@@ -157,6 +168,27 @@ export async function switchCmd(
         console.log(
           "(estimates; cache writes are billed 2× — see docs/explainer)"
         );
+      }
+    }
+
+    // --keep-warm <duration>: schedule cache pings on the account being LEFT,
+    // so coming back to it within the duration is a cache read, not a rebuild.
+    // This flag was documented in the README's feature table long before the
+    // command accepted it. Delegating to `keepalive` gets its plan output (the
+    // per-ping cost, the break-even) and its 80% guardrail for free. A failure
+    // here stops the switch: launching Claude over the top of it would bury
+    // the one line telling the user their keep-warm never started.
+    if (keepWarm) {
+      const keepaliveResult = await keepalive(
+        [currentProfileInfo.name, "--for", keepWarm],
+        { json: false }
+      );
+      if (keepaliveResult !== 0) {
+        console.error(
+          `lodestone switch: --keep-warm failed; not launching ${targetProfileName}. ` +
+            `Fix the keepalive error above, or run \`lodestone switch ${targetProfileName}\` without it.`
+        );
+        return keepaliveResult;
       }
     }
 

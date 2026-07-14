@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { statSync } from "node:fs";
 import { join } from "node:path";
-import { latestSession, parseSession } from "../core/transcript.js";
+import { latestSession, parseSession, findSessionById } from "../core/transcript.js";
 import { resolveActingProfile } from "../core/profiles.js";
 import { findProjectRoot } from "../core/paths.js";
 import { snapshot } from "./snapshot.js";
@@ -246,37 +246,6 @@ Output ONLY the rewritten sections in this format:
     console.error(`lodestone handoff: ${msg}`);
     return 1;
   }
-}
-
-/**
- * Find a session by ID in a config directory, within the current project.
- */
-function findSessionById(
-  configDir: string,
-  cwd: string,
-  sessionId: string
-): string | undefined {
-  const { mungeCwd, projectsDirFor } = require("../core/paths.js");
-  const { readdirSync, existsSync } = require("node:fs");
-  const { join } = require("node:path");
-
-  const munged = mungeCwd(cwd);
-  const projectsDir = projectsDirFor(configDir);
-  const projectDir = join(projectsDir, munged);
-
-  if (!existsSync(projectDir)) {
-    return undefined;
-  }
-
-  const files = readdirSync(projectDir);
-
-  for (const file of files) {
-    if (file === `${sessionId}.jsonl`) {
-      return join(projectDir, file);
-    }
-  }
-
-  return undefined;
 }
 
 /**

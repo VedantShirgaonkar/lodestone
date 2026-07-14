@@ -3,12 +3,23 @@ import { homedir } from "node:os";
 import { join, resolve, dirname } from "node:path";
 
 /**
- * Munge a filesystem path to Claude Code's project directory naming:
- * replace `/` with `-` to create a flat project dir name.
- * E.g. `/Users/alex/code/myapp` -> `-Users-alex-code-myapp`
+ * Munge a filesystem path to Claude Code's project directory naming.
+ *
+ * The real rule, verified against live `~/.claude/projects` entries and
+ * Claude Code's issue tracker (anthropics/claude-code#19972, #30828): every
+ * character that is not ASCII alphanumeric or `-` becomes `-`. Not just `/`.
+ * Spaces, dots, underscores, backslashes, non-ASCII — all of it.
+ *
+ * This function used to replace only `/`, so for any project whose path
+ * contained a space (`~/Desktop/RAIT QA` → `-Users-…-RAIT-QA` on disk, but
+ * `-Users-…-RAIT QA` from us) the session lookup resolved to a directory that
+ * does not exist, and every per-project command quietly reported "no session".
+ * On the machine this was found on, that was 3 of 9 real projects.
+ *
+ * E.g. `/Users/alex/code/my app` -> `-Users-alex-code-my-app`
  */
 export function mungeCwd(cwd: string): string {
-  return cwd.split("/").join("-");
+  return cwd.replace(/[^A-Za-z0-9-]/g, "-");
 }
 
 /**

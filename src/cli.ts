@@ -205,9 +205,26 @@ export async function main(argv: string[]): Promise<number> {
       }
 
       default:
-        // Check if it's a bare-launch profile name (not a command)
+        // A bare token can be a profile name (`lodestone work` launches
+        // Claude on the work profile) — but only check that AFTER ruling out
+        // a typo'd command, or `lodestone stauts` answers with the launcher's
+        // baffling "profile not found: stauts".
         if (!COMMAND_NAMES.has(command)) {
-          return await launch([command, ...commandArgs], cmdOpts);
+          const { loadConfig } = await import("./core/config.js");
+          try {
+            const cfg = loadConfig();
+            if (cfg.profiles[command]) {
+              return await launch([command, ...commandArgs], cmdOpts);
+            }
+          } catch {
+            // fall through to the error below
+          }
+          printError(
+            `unknown command or profile: ${command}\n` +
+              `  commands:  lodestone --help\n` +
+              `  profiles:  lodestone profile list`
+          );
+          return 2;
         }
 
         printError(`Unknown command: ${command}`);
@@ -297,12 +314,15 @@ Commands:
   snapshot             Snapshot current session to handoff file
   handoff              Snapshot + optional distillation
   switch               Switch to a profile with handoff
+  refresh              Save a handoff, then /clear to reload it in place
+  trail                Keep a running notes file per project (on|off|status)
   status               Show profile burn and session status
   doctor               Diagnose setup issues
   dash                 Live TUI dashboard
   keepalive            Keep session warm with TTL refresh pings
   audit                Analyze handoff and switch events
-  init                 Initialize hooks and config
+  init                 Initialize hooks, statusline, and the /handoff skill
+  config               Get or set lodestone settings
 
 Internal:
   hook                 (internal: session lifecycle hooks)
@@ -353,7 +373,54 @@ Usage: lodestone handoff [--distill] [--force] [--session <id>]`,
 
     switch: `lodestone switch — switch to a profile with handoff
 
-Usage: lodestone switch <profile> [--distill] [--stay]`,
+Usage: lodestone switch <profile> [--distill] [--stay] [--keep-warm <duration>]
+
+Options:
+  --distill            Distill the handoff via the model (spends tokens; prints cost first)
+  --stay               Write the handoff and print costs, but do not launch Claude
+  --keep-warm <dur>    Schedule cache pings on the account you are leaving (e.g. 90m)`,
+
+    refresh: `lodestone refresh — save a handoff for a same-account context refresh
+
+Usage: lodestone refresh [--distill]
+
+Writes a handoff from the current session, then you type /clear in Claude Code
+and the fresh session reloads it automatically.
+
+Options:
+  --distill            Distill the handoff via the model (spends tokens; prints cost first)`,
+
+    trail: `lodestone trail — a running notes file Claude keeps current
+
+Usage: lodestone trail on|off|status
+
+Costs real tokens while on (Claude rewrites the notes as it works), so it is
+off by default and enabled per project.`,
+
+    init: `lodestone init — install hooks, statusline, and the /handoff skill
+
+Usage: lodestone init [--statusline] [--project] [--force]
+
+Options:
+  --statusline         Also configure the live status line
+  --project            Install into this project's .claude/ instead of profiles
+  --force              Overwrite an existing statusline command`,
+
+    config: `lodestone config — get or set lodestone settings
+
+Usage: lodestone config get <key>
+       lodestone config set <key> <value>
+
+Keys:
+  realUsage            on|off — fetch your true quota from Anthropic (opt-in)
+  autoSnapshot         on|off — free snapshot at session end and pre-compact
+  maxAgeDays           How old a handoff can be and still auto-load (default 7)
+  advisor.fiveHourPct  Warn threshold for the 5h window (default 85)
+  advisor.weeklyPct    Warn threshold for the weekly window (default 90)
+  advisor.criticalPct  Bank a recovery snapshot at this 5h % (default 95)
+  advisor.trailStaleMinutes  Trail staleness reminder (default 20)
+  keepalive.maxWindowPct     Keepalive guardrail (default 80)
+  plan                 pro|max5|max20|team`,
 
     status: `lodestone status — show profile burn and session status
 

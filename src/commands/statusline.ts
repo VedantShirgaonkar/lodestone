@@ -184,7 +184,12 @@ export async function statusline(): Promise<number> {
         }
       }
     } else {
-      // Fallback: estimate from window burn (skip if >400 jsonl files)
+      // Fallback: no live rate_limits in the payload. Report the measured
+      // burn in weighted tokens, never as a percentage: a percentage needs a
+      // budget, the budget would be a guess at the user's plan, and dividing
+      // a real measurement by a guess is how an early build printed "9297%".
+      // status.ts already refuses this; the statusline was the one surface
+      // still doing it. (Skipped over 400 transcripts — too slow for a hook.)
       if (currentProfile) {
         const projectsDir = projectsDirFor(currentProfile.configDir);
         const hasManySessions = projectsHasManySessions(projectsDir);
@@ -192,13 +197,12 @@ export async function statusline(): Promise<number> {
         if (!hasManySessions) {
           try {
             const burnResult = await windowBurn(currentProfile.configDir, new Date());
-            const burnPct = Math.round((burnResult.burn / 200000) * 100); // Default pro budget
-            fiveHourStr = ` · 5h ≈${burnPct}%`;
+            if (burnResult.burn > 0) {
+              fiveHourStr = ` · 5h ~${fmtTok(burnResult.burn)} ${dim("est")}`;
+            }
           } catch {
-            fiveHourStr = " · 5h ?%";
+            // No measurement either; print no 5h segment at all.
           }
-        } else {
-          fiveHourStr = " · 5h ?%";
         }
       }
     }

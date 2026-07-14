@@ -1,6 +1,7 @@
 import { parseArgs } from "node:util";
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync, appendFileSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import { homedir } from "node:os";
 import { loadConfig } from "../core/config.js";
 import { findProjectRoot } from "../core/paths.js";
@@ -72,6 +73,14 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`profile ${profileName}: ${msg}`);
       }
+
+      // Install the /handoff skill where this profile's Claude Code discovers
+      // personal skills: <configDir>/skills/handoff/SKILL.md. Until this line
+      // existed, nothing on the documented setup path installed the skill at
+      // all — only `init --project` copied it, per project, so every user who
+      // ran `lodestone setup` had a README, an advisor and a wizard all
+      // recommending a /handoff command that did not exist in their sessions.
+      installSkill(join(profileConfigDir, "skills", "handoff", "SKILL.md"), profileName);
 
       // Install statusline if requested
       if (isStatusline) {
@@ -171,21 +180,8 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
       console.log(`.gitignore: ${handoffIgnore} already present`);
     }
 
-    // Copy SKILL.md
-    try {
-      const skillSourcePath = resolveSkillPath();
-      if (existsSync(skillSourcePath)) {
-        const skillDestDir = join(claudeDir, "skills", "handoff");
-        mkdirSync(skillDestDir, { recursive: true });
-        const skillDestPath = join(skillDestDir, "SKILL.md");
-
-        copyFileSync(skillSourcePath, skillDestPath);
-        console.log(`skill: /handoff installed`);
-      }
-    } catch (err) {
-      // Silent fail on skill copy
-      console.error(`skill copy failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    // Copy the /handoff skill into the project's own skills dir.
+    installSkill(join(claudeDir, "skills", "handoff", "SKILL.md"));
 
     // Install statusline if requested
     if (isStatusline) {
@@ -239,14 +235,37 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
 }
 
 /**
+ * Copy the bundled /handoff SKILL.md to a destination, reporting the outcome.
+ * A missing bundle is reported, never silently skipped: a silent skip here is
+ * how the skill went uninstalled for every user without anyone noticing.
+ */
+function installSkill(destPath: string, profileName?: string): void {
+  const prefix = profileName ? `profile ${profileName}: ` : "";
+  try {
+    const source = resolveSkillPath();
+    if (!existsSync(source)) {
+      console.error(`${prefix}skill: bundled SKILL.md not found at ${source}`);
+      return;
+    }
+    mkdirSync(dirname(destPath), { recursive: true });
+    copyFileSync(source, destPath);
+    console.log(`${prefix}skill: /handoff installed`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`${prefix}skill copy failed: ${msg}`);
+  }
+}
+
+/**
  * Resolve the path to the bundled SKILL.md file.
  * Package structure: dist/commands/, so ../../skills/handoff/SKILL.md
  */
 function resolveSkillPath(): string {
-  // When compiled, this file is at dist/commands/init.js
-  // So we go up to dist/, then into skills/handoff/
-  const commandsDir = dirname(import.meta.url.replace("file://", ""));
-  const distDir = dirname(commandsDir);
-  const skillPath = join(distDir, "..", "skills", "handoff", "SKILL.md");
-  return resolve(skillPath);
+  // fileURLToPath, never a string-replace on the URL: `import.meta.url` is
+  // percent-encoded (a space is %20) and carries a drive-letter prefix on
+  // Windows (file:///C:/…), so the naive strip produced a path that exists on
+  // no machine outside a POSIX install with no spaces — and the existsSync
+  // guard above then skipped the copy without a word.
+  const commandsDir = dirname(fileURLToPath(import.meta.url));
+  return resolve(join(commandsDir, "..", "..", "skills", "handoff", "SKILL.md"));
 }
