@@ -285,3 +285,26 @@ test("uninstall: takes down our own statusline when it is ours", async () => {
   const after = JSON.parse(readFileSync(join(w.claudeDir, "settings.json"), "utf8"));
   assert.equal(after.statusLine, undefined, "our statusline must be gone");
 });
+
+test("profile add: the new profile is wired immediately, hooks and skill included", async () => {
+  const w = world();
+  mkdirSync(w.claudeDir, { recursive: true });
+
+  // The user set up the statusline on their first profile.
+  await runCli(["init", "--statusline"], w.env);
+
+  const result = await runCli(["profile", "add", "work"], w.env);
+  assert.equal(result.code, 0, result.stderr);
+  assert.match(result.stdout, /profile added: work/);
+  assert.match(result.stdout, /hooks installed/);
+  assert.match(result.stdout, /skill: \/handoff installed/);
+  assert.match(result.stdout, /statusline configured/, "statusline intent inherits to the new account");
+  assert.match(result.stdout, /lodestone login work/);
+
+  // doctor should be green for the NEW profile with zero extra steps. A
+  // profile added after init used to get nothing, and doctor was the first
+  // place anyone found out.
+  const doctorOut = (await runCli(["doctor"], w.env)).stdout;
+  assert.match(doctorOut, /ok: hooks \(work\)/, doctorOut);
+  assert.match(doctorOut, /ok: skill \/handoff \(work\)/, doctorOut);
+});

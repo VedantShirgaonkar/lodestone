@@ -51,9 +51,23 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
     // prints the cost estimate before spending (ADR-003), applies the
     // cold-cache refusal, and marks the meta only when it actually distilled.
     if (distill) {
-      const result = await handoff(["--distill"], opts);
+      // In --json mode, quiet the delegate: refresh owns the one JSON document.
+      const result = await handoff(
+        opts.json ? ["--distill", "--quiet"] : ["--distill"],
+        opts
+      );
       if (result !== 0) {
         return result;
+      }
+      if (opts.json) {
+        console.log(
+          JSON.stringify({
+            saved: true,
+            handoffPath: `${projectRoot}/.claude/handoff/latest.md`,
+            distilled: true,
+          })
+        );
+        return 0;
       }
       console.log("Handoff saved. Next steps:");
       console.log("1. In Claude Code, type: /clear");
@@ -95,11 +109,9 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
     // Save handoff
     saveHandoff(projectRoot, composed.markdown, composed.meta);
 
-    // Output instructions
-    console.log("Handoff saved. Next steps:");
-    console.log("1. In Claude Code, type: /clear");
-    console.log("2. The handoff will load automatically in your fresh session");
-
+    // Machine output must be machine-clean: one JSON document, nothing else.
+    // The human instructions used to print first even with --json, so any
+    // consumer parsing stdout got prose stapled to its JSON.
     if (opts.json) {
       console.log(
         JSON.stringify({
@@ -108,7 +120,12 @@ export async function refresh(args: string[], opts: CommandOptions): Promise<num
           contextTokens: composed.meta.contextTokens,
         })
       );
+      return 0;
     }
+
+    console.log("Handoff saved. Next steps:");
+    console.log("1. In Claude Code, type: /clear");
+    console.log("2. The handoff will load automatically in your fresh session");
 
     return 0;
   } catch (err) {

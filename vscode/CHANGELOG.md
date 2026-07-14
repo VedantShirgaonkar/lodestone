@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.6
+
+Found by a user clicking through every action.
+
+- **Refresh In Place now happens inside the editor.** The handoff is saved in the background, and a new conversation is started in the Claude Code panel, where the session-start hook loads it automatically. No terminal. Falls back to a "type /clear" hint in editors without the Claude Code extension.
+- **The trail toggle can now turn trail mode off.** Its status check ran in the extension host's own directory rather than the workspace, so it always answered "not installed" and the toggle was a one-way switch to on. Per-project commands now run in the workspace folder.
+- **Menu labels state what will happen**: "Trail Mode: turn off" when it is on, "Disable real usage data" when it is enabled, and a "Keep Warm: stop" entry per running scheduler (pids verified alive, with pings-sent shown). Trail, keep-warm stop and the real-usage toggle run in the background with a notification instead of opening a terminal.
+- Handoff & Switch and keep-warm start stay in the terminal deliberately: the switch launches an interactive Claude on the other account, and the keep-warm plan prints its per-ping cost before anything spends.
+
 ## 0.1.5
 
 - **Per-model weekly quota rows in the panel.** When the usage endpoint meters a model separately (`seven_day_opus`, `seven_day_sonnet` on plans with per-model caps), the panel shows a `Weekly (opus)` row with its own bar and reset countdown. Handled generically: any bucket the endpoint returns appears, buckets it returns as null render nothing. Requires `lodestone-cli` with `realUsage` on.

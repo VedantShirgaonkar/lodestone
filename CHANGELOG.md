@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-07-14
+
+Found by a user running the full manual test plan.
+
+### Fixed
+
+- **`--distill` failures now say why.** Every failure used to collapse to "distillation failed" with the diagnostic thrown away: non-zero exits, timeouts, and the one seen in the wild, where the forked model spent its single `--max-turns 1` turn reaching for a tool instead of answering, so the run ended as `error_max_turns` with no text. The fork is now told up front, via the system prompt, that no tools exist; failures name their reason (exit code and stderr, the error subtype, or the timeout); and the timeout is 240s instead of 120s for slower models.
+- **`profile add` wires the new profile immediately.** A profile created after `init` got no hooks, no `/handoff` skill and no statusline until the user re-ran `init` by hand, which nothing told them to do, so `doctor` was the first place anyone learned their new account was bare. `add` now installs hooks and the skill, inherits the statusline when any existing profile runs lodestone's, and points at `lodestone login <name>`.
+- **`refresh --json` emits one clean JSON document** instead of prose stapled to JSON.
+
+
 ## [0.5.0] - 2026-07-14
 
 **A release-gate audit of every feature, run the way a new user would hit them. It found two features that had never existed and one bug that hid three of nine real projects.**

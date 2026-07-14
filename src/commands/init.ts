@@ -64,75 +64,36 @@ async function initUser(isStatusline: boolean, force: boolean): Promise<number> 
       return 1;
     }
 
-    // Get the hook command (allow override via env for testing)
-    const hookCmd = process.env.LODESTONE_HOOK_CMD || "lodestone hook";
-
-    // Create ~/.config/lodestone if it doesn't exist
-    const configDir = dirname(config.settings ? "" : join(homedir(), ".config", "lodestone", "config.json"));
-    mkdirSync(configDir, { recursive: true });
-
-    // Install hooks into each profile
+    // Install into each profile through the one wiring path.
     for (const [profileName, profile] of Object.entries(config.profiles)) {
-      const profileConfigDir = profile.configDir;
+      wireProfile(profileName, profile.configDir, { statusline: isStatusline });
 
-      try {
-        installHooks(profileConfigDir, {
-          sessionStartCmd: `${hookCmd} session-start`,
-          sessionStartMatcher: "startup|clear",
-          sessionEndCmd: `${hookCmd} session-end`,
-          preCompactCmd: `${hookCmd} pre-compact`,
-          userPromptSubmitCmd: `${hookCmd} user-prompt-submit`,
-        });
-
-        console.log(`profile ${profileName}: hooks installed`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`profile ${profileName}: ${msg}`);
-      }
-
-      // Install the /handoff skill where this profile's Claude Code discovers
-      // personal skills: <configDir>/skills/handoff/SKILL.md. Until this line
-      // existed, nothing on the documented setup path installed the skill at
-      // all — only `init --project` copied it, per project, so every user who
-      // ran `lodestone setup` had a README, an advisor and a wizard all
-      // recommending a /handoff command that did not exist in their sessions.
-      installSkill(join(profileConfigDir, "skills", "handoff", "SKILL.md"), profileName);
-
-      // Install statusline if requested
-      if (isStatusline) {
+      // Statusline conflicts still deserve their say: wireProfile skips a
+      // foreign statusline silently, but init --statusline was asked for it
+      // explicitly, so report when --force would be needed.
+      if (isStatusline && !force) {
         try {
-          const settingsPath = join(profileConfigDir, "settings.json");
-          let settings: Record<string, unknown> = {};
-
+          const settingsPath = join(profile.configDir, "settings.json");
           if (existsSync(settingsPath)) {
-            const raw = readFileSync(settingsPath, "utf8");
-            settings = JSON.parse(raw) as Record<string, unknown>;
-          }
-
-          // Check if statusLine already exists and is different
-          const existingStatusLine = settings.statusLine as Record<string, unknown> | undefined;
-          if (existingStatusLine && typeof existingStatusLine === "object") {
-            const existingCmd = existingStatusLine.command;
-            const ourCmd = "lodestone statusline";
-            if (
-              existingCmd &&
-              typeof existingCmd === "string" &&
-              existingCmd !== ourCmd &&
-              !force
-            ) {
+            const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+            const existing = settings.statusLine as Record<string, unknown> | undefined;
+            if (existing && existing.command && existing.command !== "lodestone statusline") {
               console.error(
                 `profile ${profileName}: statusLine command already set; use --force to override`
               );
-              continue;
             }
           }
-
-          // Set statusLine
-          settings.statusLine = {
-            type: "command",
-            command: "lodestone statusline",
-          };
-
+        } catch {
+          // reported by wireProfile already
+        }
+      } else if (isStatusline && force) {
+        try {
+          const settingsPath = join(profile.configDir, "settings.json");
+          let settings: Record<string, unknown> = {};
+          if (existsSync(settingsPath)) {
+            settings = JSON.parse(readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+          }
+          settings.statusLine = { type: "command", command: "lodestone statusline" };
           mkdirSync(dirname(settingsPath), { recursive: true });
           writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
           console.log(`profile ${profileName}: statusline configured`);
@@ -247,6 +208,57 @@ async function initProject(isStatusline: boolean, force: boolean): Promise<numbe
     const msg = err instanceof Error ? err.message : String(err);
     console.error(`lodestone init --project: ${msg}`);
     return 1;
+  }
+}
+
+/**
+ * Wire one profile the way `init` wires all of them: hooks and the /handoff
+ * skill, plus the statusline when asked. Exported for `profile add`: a
+ * profile created after `init` ran used to get nothing until the user
+ * re-ran init by hand, which nothing told them to do, so `doctor` was the
+ * first place they learned their new account had no hooks.
+ */
+export function wireProfile(
+  profileName: string,
+  configDir: string,
+  opts?: { statusline?: boolean }
+): void {
+  const hookCmd = process.env.LODESTONE_HOOK_CMD || "lodestone hook";
+
+  try {
+    installHooks(configDir, {
+      sessionStartCmd: `${hookCmd} session-start`,
+      sessionStartMatcher: "startup|clear",
+      sessionEndCmd: `${hookCmd} session-end`,
+      preCompactCmd: `${hookCmd} pre-compact`,
+      userPromptSubmitCmd: `${hookCmd} user-prompt-submit`,
+    });
+    console.log(`profile ${profileName}: hooks installed`);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`profile ${profileName}: ${msg}`);
+  }
+
+  installSkill(join(configDir, "skills", "handoff", "SKILL.md"), profileName);
+
+  if (opts?.statusline) {
+    try {
+      const settingsPath = join(configDir, "settings.json");
+      let settings: Record<string, unknown> = {};
+      if (existsSync(settingsPath)) {
+        settings = JSON.parse(readFileSync(settingsPath, "utf8")) as Record<string, unknown>;
+      }
+      const existing = settings.statusLine as Record<string, unknown> | undefined;
+      if (!existing || existing.command === "lodestone statusline") {
+        settings.statusLine = { type: "command", command: "lodestone statusline" };
+        mkdirSync(dirname(settingsPath), { recursive: true });
+        writeFileSync(settingsPath, JSON.stringify(settings, null, 2), "utf8");
+        console.log(`profile ${profileName}: statusline configured`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`profile ${profileName}: statusline failed: ${msg}`);
+    }
   }
 }
 

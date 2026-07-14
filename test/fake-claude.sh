@@ -31,6 +31,11 @@ if [ -n "$FAKE_CLAUDE_STDOUT" ]; then
   echo "$FAKE_CLAUDE_STDOUT"
 fi
 
+# Output stderr if specified
+if [ -n "$FAKE_CLAUDE_STDERR" ]; then
+  echo "$FAKE_CLAUDE_STDERR" >&2
+fi
+
 # Output file contents if specified
 if [ -n "$FAKE_CLAUDE_STDOUT_FILE" ] && [ -f "$FAKE_CLAUDE_STDOUT_FILE" ]; then
   cat "$FAKE_CLAUDE_STDOUT_FILE"

@@ -10,9 +10,19 @@ import {
   buildTooltipMarkdown,
   parseAuditTotals,
   expiryToastDecisions,
+  listRunningKeepalives,
   StatusModel,
 } from "./model.js";
 import { locateCli, runJson, clearCache } from "./cli.js";
+
+/** The workspace the user is looking at; per-project CLI calls run here. */
+function workspaceCwd(): string | undefined {
+  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+}
+
+function configHome(): string {
+  return process.env.XDG_CONFIG_HOME || join(homedir(), ".config");
+}
 
 let statusBarItem: vscode.StatusBarItem;
 let refreshInterval: NodeJS.Timeout | null = null;
@@ -190,7 +200,7 @@ async function buildStatusModel(): Promise<StatusModel> {
   // Refresh the usage bridge by calling status --json
   // This forces the CLI to fetch live data when it is stale and realUsage is on
   try {
-    runJson("status");
+    runJson("status", [], { cwd: workspaceCwd() ?? undefined });
   } catch {
     // Silent fail
   }
@@ -233,7 +243,7 @@ async function buildStatusModel(): Promise<StatusModel> {
   let auditTotals: { totalEvents: number; totalEstimatedSaved: number } | undefined =
     undefined;
   try {
-    const auditJson = runJson("audit");
+    const auditJson = runJson("audit", [], { cwd: workspaceCwd() ?? undefined });
     if (auditJson) {
       auditTotals = parseAuditTotals(auditJson);
     }
@@ -251,18 +261,43 @@ async function buildStatusModel(): Promise<StatusModel> {
 }
 
 /**
- * Handle the main menu QuickPick.
+ * Handle the main menu QuickPick. Labels state the action that will actually
+ * happen: "turn off" when a thing is on, "stop" when a scheduler runs.
  */
 async function handleMenu() {
-  const actions = [
+  const registry = loadRegistry();
+  const trailInstalled = readTrailInstalled();
+  const running = listRunningKeepalives(configHome());
+  const realUsageOn = registry.settings?.realUsage === true;
+
+  const actions: Array<{ label: string; value: string }> = [
     { label: "Handoff & Switch Account…", value: "handoff" },
     { label: "Refresh In Place…", value: "refresh-in-place" },
-    { label: "Trail Mode: toggle", value: "trail-toggle" },
+    {
+      label:
+        trailInstalled === undefined
+          ? "Trail Mode: toggle"
+          : trailInstalled
+            ? "Trail Mode: turn off"
+            : "Trail Mode: turn on",
+      value: "trail-toggle",
+    },
     { label: "Keep Current Account Warm…", value: "keepWarm" },
+  ];
+  for (const ka of running) {
+    actions.push({
+      label: `Keep Warm: stop (${ka.profile}, ${ka.pings}/${ka.cap} pings sent)`,
+      value: `keepWarm-stop:${ka.profile}`,
+    });
+  }
+  actions.push(
     { label: "Open Dashboard (terminal)", value: "dash" },
     { label: "Refresh Status", value: "refresh" },
-    { label: "Enable real usage data", value: "realUsage" },
-  ];
+    {
+      label: realUsageOn ? "Disable real usage data" : "Enable real usage data",
+      value: "realUsage",
+    }
+  );
 
   const picked = await vscode.window.showQuickPick(actions, {
     placeHolder: "lodestone actions",
@@ -270,11 +305,15 @@ async function handleMenu() {
 
   if (!picked) return;
 
+  if (picked.value.startsWith("keepWarm-stop:")) {
+    return handleKeepWarmStop(picked.value.slice("keepWarm-stop:".length));
+  }
+
   switch (picked.value) {
     case "handoff":
       return handleHandoffSwitch();
     case "refresh-in-place":
-      return runInTerminal("lodestone refresh");
+      return handleRefreshInPlace();
     case "trail-toggle":
       return handleTrailToggle();
     case "keepWarm":
@@ -284,8 +323,78 @@ async function handleMenu() {
     case "refresh":
       return updateStatus();
     case "realUsage":
-      return runInTerminal("lodestone config set realUsage on");
+      return handleRealUsageToggle(realUsageOn);
   }
+}
+
+/** Trail state for the current workspace; undefined when it cannot be read. */
+function readTrailInstalled(): boolean | undefined {
+  try {
+    const cwd = workspaceCwd();
+    if (!cwd) return undefined;
+    const statusJson = runJson("trail", ["status"], { cwd, fresh: true });
+    if (!statusJson) return undefined;
+    return (JSON.parse(statusJson) as { installed?: boolean }).installed ?? false;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Refresh in place, inside the editor: save the handoff in the background,
+ * then start a new conversation in the Claude Code panel, whose session-start
+ * hook loads the handoff on its own. Falls back to the terminal when the
+ * Claude Code extension is not installed to receive the command.
+ */
+async function handleRefreshInPlace() {
+  const cwd = workspaceCwd();
+  if (!cwd) {
+    vscode.window.showErrorMessage("lodestone: open a folder first");
+    return;
+  }
+
+  const out = runJson("refresh", [], { cwd, fresh: true });
+  if (!out) {
+    vscode.window.showErrorMessage(
+      "lodestone: refresh failed — is there a Claude session for this project?"
+    );
+    return;
+  }
+
+  try {
+    await vscode.commands.executeCommand("claude-vscode.newConversation");
+    vscode.window.showInformationMessage(
+      "lodestone: handoff saved — new conversation started, it loads automatically"
+    );
+  } catch {
+    vscode.window.showInformationMessage(
+      "lodestone: handoff saved — type /clear in Claude Code and it loads automatically"
+    );
+  }
+  updateStatus();
+}
+
+async function handleKeepWarmStop(profile: string) {
+  if (!isSafeToken(profile)) return;
+  const out = runJson("keepalive", ["--stop", profile], { fresh: true });
+  vscode.window.showInformationMessage(
+    out !== undefined
+      ? `lodestone: keepalive stopped for ${profile}`
+      : `lodestone: could not stop keepalive for ${profile}`
+  );
+  updateStatus();
+}
+
+async function handleRealUsageToggle(currentlyOn: boolean) {
+  const target = currentlyOn ? "off" : "on";
+  const out = runJson("config", ["set", "realUsage", target], { fresh: true });
+  vscode.window.showInformationMessage(
+    out !== undefined
+      ? `lodestone: real usage data ${target}`
+      : "lodestone: could not update realUsage"
+  );
+  clearCache();
+  updateStatus();
 }
 
 /**
@@ -314,24 +423,34 @@ async function handleHandoffSwitch() {
 }
 
 /**
- * Handle trail mode toggle: check current state and toggle.
+ * Handle trail mode toggle: check current state IN THE WORKSPACE and flip it.
+ * The status check used to run without a cwd, so it was answered for the
+ * extension host's own directory — never the workspace — and always said
+ * "not installed", which made this toggle a one-way switch to on.
  */
 async function handleTrailToggle() {
-  try {
-    const statusJson = runJson("trail", ["status"]);
-    if (!statusJson) {
-      vscode.window.showErrorMessage("Failed to check trail status");
-      return;
-    }
-
-    const status = JSON.parse(statusJson);
-    const installed = status.installed ?? false;
-
-    const command = installed ? "lodestone trail off" : "lodestone trail on";
-    runInTerminal(command);
-  } catch {
-    vscode.window.showErrorMessage("Failed to toggle trail mode");
+  const cwd = workspaceCwd();
+  if (!cwd) {
+    vscode.window.showErrorMessage("lodestone: open a folder first");
+    return;
   }
+
+  const installed = readTrailInstalled();
+  if (installed === undefined) {
+    vscode.window.showErrorMessage("lodestone: failed to check trail status");
+    return;
+  }
+
+  const out = runJson("trail", [installed ? "off" : "on"], { cwd, fresh: true });
+  if (out === undefined) {
+    vscode.window.showErrorMessage("lodestone: failed to toggle trail mode");
+    return;
+  }
+  vscode.window.showInformationMessage(
+    installed
+      ? "lodestone: trail mode off"
+      : "lodestone: trail mode on for this project (costs tokens while Claude keeps notes)"
+  );
 }
 
 /**

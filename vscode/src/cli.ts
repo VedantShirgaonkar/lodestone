@@ -10,13 +10,19 @@ const CACHE_TTL_MS = 60 * 1000; // 60s cache per command
  * environment contains can be interpreted as shell syntax, and paths with
  * spaces work. Do not reintroduce exec/execSync.
  */
-function run(bin: string, args: string[], timeoutMs: number) {
+function run(bin: string, args: string[], timeoutMs: number, cwd?: string) {
   return spawnSync(bin, args, {
     shell: false,
     encoding: "utf8",
     timeout: timeoutMs,
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
+    // Per-project commands (trail status, refresh, switch tax) resolve their
+    // project from the process cwd. The extension host's own cwd is the app
+    // bundle, not the workspace, so without this every per-project answer was
+    // computed for a directory the user has never seen: trail status always
+    // said "not installed", which is why the toggle could only ever turn on.
+    cwd,
   });
 }
 
@@ -39,20 +45,26 @@ export function locateCli(): string | null {
  * Run a lodestone command that emits JSON on stdout.
  * Never throws; returns undefined on any failure. Results cached for 60s.
  */
-export function runJson(cmd: string, args?: string[]): string | undefined {
+export function runJson(
+  cmd: string,
+  args?: string[],
+  opts?: { cwd?: string; fresh?: boolean }
+): string | undefined {
   const bin = locateCli();
   if (!bin) {
     return undefined;
   }
 
   const argv = [cmd, ...(args ?? []), "--json"];
-  const key = [bin, ...argv].join(" "); // cache key only, never a command
-  const hit = cache[key];
-  if (hit && Date.now() - hit.time < CACHE_TTL_MS) {
-    return hit.output;
+  const key = [bin, ...argv, opts?.cwd ?? ""].join(" "); // cache key only, never a command
+  if (!opts?.fresh) {
+    const hit = cache[key];
+    if (hit && Date.now() - hit.time < CACHE_TTL_MS) {
+      return hit.output;
+    }
   }
 
-  const result = run(bin, argv, 60_000);
+  const result = run(bin, argv, 60_000, opts?.cwd);
   if (result.error || result.status !== 0 || typeof result.stdout !== "string") {
     return undefined;
   }

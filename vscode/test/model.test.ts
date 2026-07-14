@@ -6,6 +6,7 @@ import {
   loadRegistry,
   loadProfileQuota,
   cacheWarmth,
+  listRunningKeepalives,
   buildStatusText,
   buildTooltipMarkdown,
   parseAuditTotals,
@@ -823,4 +824,26 @@ test("tooltip: renders per-model weekly rows from the oauth cache", () => {
   const md = buildTooltipMarkdown(model);
   assert.match(md, /Weekly \(opus\)/, `tooltip must carry the opus row: ${md}`);
   assert.doesNotMatch(md, /Weekly \(sonnet\)/, "a null bucket is not a row");
+});
+
+/**
+ * Test: listRunningKeepalives probes pids instead of believing state files.
+ */
+test("listRunningKeepalives: reports only schedulers whose pid is alive", () => {
+  const tmpDir = mkdtempSync(join(tmpdir(), "lodestone-test-"));
+  mkdirSync(join(tmpDir, "lodestone"), { recursive: true });
+
+  writeFileSync(
+    join(tmpDir, "lodestone", "keepalive-personal.json"),
+    JSON.stringify({ profile: "personal", pid: 11111, pings: [{}, {}], cap: 3 })
+  );
+  writeFileSync(
+    join(tmpDir, "lodestone", "keepalive-work.json"),
+    JSON.stringify({ profile: "work", pid: 22222, pings: [], cap: 3 })
+  );
+
+  const running = listRunningKeepalives(tmpDir, (pid) => pid === 11111);
+  assert.equal(running.length, 1, "the dead pid must not be reported");
+  assert.equal(running[0]?.profile, "personal");
+  assert.equal(running[0]?.pings, 2);
 });

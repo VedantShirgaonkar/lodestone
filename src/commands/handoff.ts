@@ -195,11 +195,13 @@ Output ONLY the rewritten sections in this format:
       cwd: process.cwd(),
     });
 
-    if (!distilledResult) {
-      // Distillation failed, but handoff already exists; treat as success
+    if (!distilledResult.ok) {
+      // The deterministic handoff already exists; keep it and say WHY the
+      // distillation failed. "distillation failed" with the reason discarded
+      // is what a user actually saw in the wild, with nothing to act on.
       if (!quiet && !opts.json) {
         console.log(
-          "distillation failed, but deterministic handoff preserved at .claude/handoff/latest.md"
+          `distillation failed (${distilledResult.reason}) — deterministic handoff preserved at .claude/handoff/latest.md`
         );
       }
       return 0;
@@ -211,7 +213,7 @@ Output ONLY the rewritten sections in this format:
     // Simple merge: extract distilled sections and replace in original
     const distilledMarkdown = replaceNarrativeSections(
       originalMarkdown,
-      distilledResult
+      distilledResult.text
     );
 
     // Update meta to mark as distilled

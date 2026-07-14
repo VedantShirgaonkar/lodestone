@@ -1,9 +1,11 @@
 import { mkdir, readdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { homedir } from "node:os";
 import { addProfile, removeProfile, currentProfile, loggedInHint } from "../core/profiles.js";
 import { loadConfig, saveConfig } from "../core/config.js";
 import { expandTilde } from "../core/paths.js";
+import { wireProfile } from "./init.js";
 
 interface CommandOptions {
   json: boolean;
@@ -54,9 +56,28 @@ async function profileAdd(args: string[]): Promise<number> {
     const profileDir = resolve(homedir(), `.claude-profiles/${name}`);
     await mkdir(profileDir, { recursive: true });
     addProfile(name, { configDir: profileDir });
-
     console.log(`profile added: ${name}`);
-    console.log(`to authenticate: lodestone ${name} /login`);
+
+    // Wire it immediately: hooks, the /handoff skill, and the statusline when
+    // any existing profile already runs ours (the user has said what they
+    // want; a new account should not need them to remember `lodestone init`).
+    // A profile added after init used to get nothing, and doctor was the
+    // first place anyone found out.
+    const config = loadConfig();
+    const inheritStatusline = Object.values(config.profiles).some((p) => {
+      try {
+        const settingsPath = resolve(expandTilde(p.configDir), "settings.json");
+        const settings = JSON.parse(readFileSync(settingsPath, "utf8")) as {
+          statusLine?: { command?: string };
+        };
+        return settings.statusLine?.command === "lodestone statusline";
+      } catch {
+        return false;
+      }
+    });
+    wireProfile(name, profileDir, { statusline: inheritStatusline });
+
+    console.log(`to authenticate: lodestone login ${name}`);
     return 0;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

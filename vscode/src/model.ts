@@ -11,11 +11,66 @@ export interface Profile {
 export interface RegistryData {
   profiles: Profile[];
   settings?: {
+    realUsage?: boolean;
     advisor?: {
       fiveHourPct?: number;
       weeklyPct?: number;
     };
   };
+}
+
+export interface RunningKeepalive {
+  profile: string;
+  pid: number;
+  pings: number;
+  cap: number;
+}
+
+/**
+ * Keepalive schedulers that are actually alive right now. A pid in a state
+ * file is a claim, not a fact: the file outlives the process, so each pid is
+ * probed (signal 0) before being reported. `isAlive` is injectable for tests.
+ */
+export function listRunningKeepalives(
+  configHome: string,
+  isAlive: (pid: number) => boolean = (pid) => {
+    try {
+      process.kill(pid, 0);
+      return true;
+    } catch (err) {
+      return (err as NodeJS.ErrnoException).code === "EPERM";
+    }
+  }
+): RunningKeepalive[] {
+  const out: RunningKeepalive[] = [];
+  try {
+    const dir = join(configHome, "lodestone");
+    if (!existsSync(dir)) return out;
+    for (const file of readdirSync(dir)) {
+      if (!file.startsWith("keepalive-") || !file.endsWith(".json")) continue;
+      try {
+        const state = JSON.parse(readFileSync(join(dir, file), "utf8")) as {
+          profile?: string;
+          pid?: number;
+          pings?: unknown[];
+          cap?: number;
+        };
+        if (state.profile && typeof state.pid === "number" && isAlive(state.pid)) {
+          out.push({
+            profile: state.profile,
+            pid: state.pid,
+            pings: state.pings?.length ?? 0,
+            cap: state.cap ?? 3,
+          });
+        }
+      } catch {
+        // unreadable state file: not a running scheduler
+      }
+    }
+  } catch {
+    // no config dir, nothing running
+  }
+  return out;
 }
 
 export interface ProfileQuotaData {
