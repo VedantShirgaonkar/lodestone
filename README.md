@@ -18,6 +18,8 @@ npm install -g lodestone-cli
 lodestone setup
 ```
 
+> **macOS: install fails with `EACCES: permission denied`?** Your npm prefix points at a root-owned directory (the macOS Node installer does this). Fix it once, no sudo: `npm config set prefix ~/.local`, make sure `~/.local/bin` is on your PATH, then run the install again.
+
 ---
 
 ## The problem this solves

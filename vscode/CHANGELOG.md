@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.7
+
+- The install callout now carries the macOS `EACCES` fix up front (root-owned npm prefix from the macOS Node installer; `npm config set prefix ~/.local`, no sudo). A user hit this as their literal first command.
+
 ## 0.1.6
 
 Found by a user clicking through every action.
