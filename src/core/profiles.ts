@@ -153,38 +153,40 @@ export function resolveActingProfile(
  */
 export function loggedInHint(profileInfo: ProfileInfo): string {
   // CLAUDE_CONFIG_DIR profiles keep .claude.json inside the dir; the default
-  // ~/.claude install keeps it as a sibling (~/.claude.json). Try both.
+  // ~/.claude install keeps it as a sibling (~/.claude.json). Read both, and
+  // prefer whichever actually CONTAINS an account, because both can exist:
+  // launching Claude Code with CLAUDE_CONFIG_DIR pointed at the default dir —
+  // which is exactly what `lodestone switch personal` does — makes it write a
+  // small state stub INSIDE ~/.claude, with no oauthAccount in it. Taking the
+  // first file that merely existed meant that stub shadowed the real sibling
+  // file, and every surface reported a logged-in user as "not logged in".
   const candidates = [
     join(profileInfo.configDir, ".claude.json"),
     `${profileInfo.configDir}.json`,
   ];
-  const claudeJsonPath = candidates.find((p) => existsSync(p));
-  if (!claudeJsonPath) {
-    return "not logged in";
-  }
 
-  try {
-    const raw = readFileSync(claudeJsonPath, "utf8");
-    const data = JSON.parse(raw);
-    const account = data?.oauthAccount;
+  for (const candidate of candidates) {
+    if (!existsSync(candidate)) continue;
+    try {
+      const data = JSON.parse(readFileSync(candidate, "utf8"));
+      const account = data?.oauthAccount;
+      if (!account) continue;
 
-    if (!account) {
-      return "not logged in";
-    }
+      const email = account.emailAddress;
+      const org = account.organizationName;
 
-    const email = account.emailAddress;
-    const org = account.organizationName;
-
-    if (email && org) {
-      return `${email} (${org})`;
-    } else if (email) {
-      return email;
-    } else if (org) {
-      return org;
-    } else {
+      if (email && org) {
+        return `${email} (${org})`;
+      } else if (email) {
+        return email;
+      } else if (org) {
+        return org;
+      }
       return "logged in";
+    } catch {
+      continue;
     }
-  } catch {
-    return "not logged in";
   }
+
+  return "not logged in";
 }

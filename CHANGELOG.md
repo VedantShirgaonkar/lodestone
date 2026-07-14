@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.3] - 2026-07-14
+
+### Fixed
+
+- **A logged-in user was reported as "not logged in" after using `switch`.** Launching Claude Code with `CLAUDE_CONFIG_DIR` pointed at the default directory — which is exactly what `lodestone switch personal` does — makes it write a small state stub at `~/.claude/.claude.json` with no account in it, while the real account stays in the sibling `~/.claude.json`. The login check took the first file that existed, so the stub shadowed the real one, and `setup`, `doctor`, `status` and `profile list` all showed "not logged in" for a healthy login. The check now prefers whichever file actually contains an account.
+
 ## [0.5.2] - 2026-07-14
 
 ### Changed
