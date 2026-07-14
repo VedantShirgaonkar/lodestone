@@ -3,7 +3,8 @@ import assert from "node:assert";
 import { execFile } from "node:child_process";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { banner, paint, step, panel } from "../src/util/tui.js";
+import { Readable } from "node:stream";
+import { banner, paint, step, panel, confirm, ask, askStep } from "../src/util/tui.js";
 
 const __testDir = fileURLToPath(new URL(".", import.meta.url));
 const CLI = resolve(__testDir, "../..", "bin/lodestone.js");
@@ -191,4 +192,72 @@ test("tui-paint: every 256-color index it emits is inside the color cube", () =>
     // the greyscale ramp, and an index outside 0..255 is simply invalid.
     assert(i >= 16 && i <= 231, `index ${i} is outside the 6x6x6 color cube`);
   }
+});
+
+// ── the wizard actually listens ─────────────────────────────────────────────
+//
+// `rl.close()` emits `close` synchronously. The line handler closed the readline
+// before resolving, so the close listener's `resolve(default)` always won and the
+// typed answer was discarded on an already-settled promise. Every question in
+// `lodestone setup` returned its default no matter what was typed. Nothing could
+// catch it, because a prompt could not be driven without a terminal.
+
+function stdinOf(text: string): Readable {
+  return Readable.from([text]);
+}
+
+const driven = (text: string) => ({ input: stdinOf(text), interactive: true });
+
+test("tui-confirm: an explicit yes beats a default of no", async () => {
+  // The visible symptom: answering y to trail mode, and being told "skipped".
+  assert.equal(await confirm("Turn it on?", false, driven("y\n")), true);
+  assert.equal(await confirm("Turn it on?", false, driven("yes\n")), true);
+});
+
+test("tui-confirm: an explicit no beats a default of yes", async () => {
+  // The dangerous one. "Enable real usage?" defaults to yes and is the only
+  // feature in the product that makes a network call. Answering n turned it on.
+  assert.equal(await confirm("Enable real usage?", true, driven("n\n")), false);
+  assert.equal(await confirm("Enable real usage?", true, driven("no\n")), false);
+});
+
+test("tui-confirm: a bare Enter takes the default, either way", async () => {
+  assert.equal(await confirm("Install?", true, driven("\n")), true);
+  assert.equal(await confirm("Install?", false, driven("\n")), false);
+});
+
+test("tui-confirm: an unrecognized answer takes the default rather than guessing", async () => {
+  assert.equal(await confirm("Install?", true, driven("maybe\n")), true);
+  assert.equal(await confirm("Install?", false, driven("maybe\n")), false);
+});
+
+test("tui-confirm: stdin ending with no answer takes the default", async () => {
+  // The one case the close listener is actually for: a pipe, or Ctrl-D.
+  assert.equal(await confirm("Install?", true, driven("")), true);
+  assert.equal(await confirm("Install?", false, driven("")), false);
+});
+
+test("tui-confirm: answers are case and whitespace insensitive", async () => {
+  assert.equal(await confirm("Install?", false, driven("  Y  \n")), true);
+  assert.equal(await confirm("Install?", true, driven("  N  \n")), false);
+});
+
+test("tui-ask: returns what was typed, not the default", async () => {
+  assert.equal(await ask("Name it", "work", driven("clientwork\n")), "clientwork");
+});
+
+test("tui-ask: falls back to the default only when nothing was typed", async () => {
+  assert.equal(await ask("Name it", "work", driven("\n")), "work");
+  assert.equal(await ask("Name it", "work", driven("")), "work");
+});
+
+test("tui-askStep: carries the answer through, it does not re-decide it", async () => {
+  const on = await askStep("Trail mode", "notes file", "Turn it on?", false, driven("y\n"));
+  assert.equal(on, true, "askStep must not lose the answer confirm read");
+});
+
+test("tui-confirm: a non-interactive run takes the default without reading stdin", async () => {
+  // A hook, a pipe, CI. Must never block waiting for input that is not coming.
+  assert.equal(await confirm("Install?", true, { interactive: false }), true);
+  assert.equal(await confirm("Install?", false, { interactive: false }), false);
 });

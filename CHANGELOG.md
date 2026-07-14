@@ -4,6 +4,25 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-07-14
+
+**The setup wizard never listened to a single answer.**
+
+### Fixed
+
+- **Every question in `lodestone setup` returned its default, whatever you typed.** `rl.close()` emits `close` synchronously, and the line handler closed the readline *before* resolving, so the close listener's `resolve(default)` always landed first and the typed answer was discarded on an already-settled promise. The close listener exists for one case, stdin ending without an answer, and it was deciding every question instead.
+
+  The three questions that default to yes and the one that defaults to no all looked correct, because agreeing with a default is indistinguishable from being ignored by it. The bug only became visible on the fifth question, where answering `y` to trail mode reported "skipped".
+
+  The serious case is the third: answering **`n`** to "Enable real usage?" turned it on anyway. That is the only feature in the product that makes a network call, and it is meant to be opt-in. An opt-in that cannot be declined is not an opt-in. `ask()` had the identical defect, so the second-account name prompt ignored what you typed too.
+
+- **`status` named projects by trying to reverse the munge.** It took the last dash-separated component of `~/.claude/projects/<munged>`, which is guesswork the project's own notes describe as impossible: `~/code/my-app` and `~/code/my/app` munge identically, and a space becomes a dash as well. On the author's machine three of six projects displayed under the wrong name (`FY Project` as "Project", `RAIT QA` as "QA", `rait-qa-agent` as "agent"). It only ever looked right on single-word directory names. The name now comes from the transcript's `cwd`, which `status` was already reading.
+
+### Added
+
+- Prompts take an injectable input stream, so a question can be driven and its answer checked without a terminal. Nothing could do that before, which is why the wizard shipped deaf.
+- `status` is covered against the real on-disk layout: project naming, and the cross-project session list.
+
 ## [0.3.0] - 2026-07-14
 
 **The advisor had never run. Neither had the hook tests that were supposed to prove it did.**

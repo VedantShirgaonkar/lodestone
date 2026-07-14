@@ -1,5 +1,5 @@
 import { parseArgs } from "node:util";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { existsSync, readdirSync, statSync, readFileSync } from "node:fs";
 import { loadConfig } from "../core/config.js";
 import { windowBurn, asPctOfWindow, switchTax } from "../core/usage.js";
@@ -284,8 +284,14 @@ function getRecentSessions(
             const lastTsMs = new Date(parsed.lastTs ?? now).getTime();
             const idleMinutes = Math.round((nowMs - lastTsMs) / (1000 * 60));
 
-            // De-munge project name (best effort)
-            const projectName = deMungeCwd(project);
+            // Name the project from the transcript's own cwd, never by trying
+            // to reverse the munge. The munge is not reversible: `~/code/my-app`
+            // and `~/code/my/app` produce the same directory name, and a space
+            // becomes a dash too. The old heuristic took the last dash-separated
+            // component, so `~/Desktop/RAIT QA` displayed as "QA" and any
+            // `my-app` displayed as "app". It only ever looked right on
+            // single-word directory names.
+            const projectName = parsed.cwd ? basename(parsed.cwd) : project;
 
             sessions.push({
               project: projectName,
@@ -312,12 +318,13 @@ function getRecentSessions(
  */
 function parseSessionSync(
   filePath: string
-): { contextTokens: number; lastTs: string | undefined } | undefined {
+): { contextTokens: number; lastTs: string | undefined; cwd: string | undefined } | undefined {
   try {
     const content = readFileSync(filePath, "utf8");
     const lines = content.split("\n");
 
     let lastTs: string | undefined;
+    let cwd: string | undefined;
     let contextTokens = 0;
 
     // Scan backward for the most recent usage info
@@ -329,6 +336,12 @@ function parseSessionSync(
         const entry = JSON.parse(line);
         if (!lastTs && entry.timestamp) {
           lastTs = entry.timestamp;
+        }
+
+        // The project's real working directory: the only reliable route back to
+        // its name, because the munge cannot be reversed.
+        if (!cwd && typeof entry.cwd === "string") {
+          cwd = entry.cwd;
         }
 
         // Extract context tokens from last turn with usage
@@ -344,7 +357,7 @@ function parseSessionSync(
             (usage.cache_creation_input_tokens ?? 0);
         }
 
-        if (lastTs && contextTokens > 0) {
+        if (lastTs && cwd && contextTokens > 0) {
           break;
         }
       } catch {
@@ -352,26 +365,12 @@ function parseSessionSync(
       }
     }
 
-    return { contextTokens, lastTs };
+    return { contextTokens, lastTs, cwd };
   } catch {
     return undefined;
   }
 }
 
-/**
- * Best-effort de-munge: reverse the mungeCwd transformation.
- * mungeCwd replaces "/" with "-", so we reverse that but can't reliably
- * recover the original path. Return basename or best guess.
- */
-function deMungeCwd(munged: string): string {
-  // Simple heuristic: if it starts with -, strip leading -, then take the last component
-  if (munged.startsWith("-")) {
-    munged = munged.slice(1);
-  }
-  // Take the last component after splitting by -
-  const parts = munged.split("-");
-  return parts[parts.length - 1] ?? munged;
-}
 
 /**
  * Format timestamp as HH:MM

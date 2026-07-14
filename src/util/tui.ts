@@ -235,69 +235,108 @@ function stripAnsi(text: string): string {
   return text.replace(/\x1b\[[0-9;]*m/g, "");
 }
 
+/**
+ * Where a prompt reads from, and whether it may prompt at all. Injectable so
+ * the wizard's answers can be tested without a terminal, which is the only
+ * reason the bug below survived: nothing could drive a question and check what
+ * came back.
+ */
+export interface PromptIO {
+  input?: NodeJS.ReadableStream;
+  interactive?: boolean;
+}
+
+/**
+ * Ask a yes/no question.
+ *
+ * The `close` listener exists for one case only: stdin ending without an answer
+ * (a pipe, or Ctrl-D), where the default is all we have. It must never decide a
+ * question the user actually answered.
+ *
+ * That is exactly what it used to do. `rl.close()` emits `close` *synchronously*,
+ * and the line handler called `rl.close()` before resolving, so the close
+ * listener's `resolve(defaultYes)` always landed first and the line handler's
+ * `resolve(answer)` was a no-op on a settled promise. Every question in the
+ * setup wizard returned its default no matter what was typed: answering `n` to
+ * "Enable real usage?" turned it on anyway, which is an opt-in that cannot be
+ * opted out of, and answering `y` to trail mode did nothing at all. Settle once,
+ * and settle before closing.
+ */
 export async function confirm(
   question: string,
-  defaultYes: boolean = true
+  defaultYes: boolean = true,
+  io: PromptIO = {}
 ): Promise<boolean> {
-  if (!canPrompt()) {
+  const interactive = io.interactive ?? canPrompt();
+  if (!interactive) {
     return defaultYes;
   }
 
   return new Promise((resolve) => {
     const rl = createInterface({
-      input: process.stdin,
+      input: io.input ?? process.stdin,
       output: stderr,
       terminal: false,
     });
 
-    const prompt = defaultYes ? " [Y/n] " : " [y/N] ";
-    stderr.write(question + prompt);
+    let settled = false;
+    const settle = (value: boolean): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    stderr.write(question + (defaultYes ? " [Y/n] " : " [y/N] "));
 
     rl.on("line", (answer) => {
-      rl.close();
       const normalized = answer.trim().toLowerCase();
-      if (normalized === "y" || normalized === "yes") {
-        resolve(true);
-      } else if (normalized === "n" || normalized === "no") {
-        resolve(false);
-      } else {
-        resolve(defaultYes);
-      }
+      settle(
+        normalized === "y" || normalized === "yes"
+          ? true
+          : normalized === "n" || normalized === "no"
+            ? false
+            : defaultYes
+      );
+      rl.close();
     });
 
-    rl.on("close", () => {
-      resolve(defaultYes);
-    });
+    rl.on("close", () => settle(defaultYes));
   });
 }
 
+/** Ask for a value. Same settle-before-close rule as `confirm`, same reason. */
 export async function ask(
   question: string,
-  defaultValue: string = ""
+  defaultValue: string = "",
+  io: PromptIO = {}
 ): Promise<string> {
-  if (!canPrompt()) {
+  const interactive = io.interactive ?? canPrompt();
+  if (!interactive) {
     return defaultValue;
   }
 
   return new Promise((resolve) => {
     const rl = createInterface({
-      input: process.stdin,
+      input: io.input ?? process.stdin,
       output: stderr,
       terminal: false,
     });
 
-    const prompt = defaultValue ? ` [${defaultValue}] ` : " ";
-    stderr.write(question + prompt);
+    let settled = false;
+    const settle = (value: string): void => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
+    stderr.write(question + (defaultValue ? ` [${defaultValue}] ` : " "));
 
     rl.on("line", (answer) => {
+      settle(answer.trim() || defaultValue);
       rl.close();
-      const trimmed = answer.trim();
-      resolve(trimmed || defaultValue);
     });
 
-    rl.on("close", () => {
-      resolve(defaultValue);
-    });
+    rl.on("close", () => settle(defaultValue));
   });
 }
 
@@ -359,9 +398,10 @@ export async function askStep(
   label: string,
   explanation: string,
   question: string,
-  defaultYes: boolean
+  defaultYes: boolean,
+  io: PromptIO = {}
 ): Promise<boolean> {
-  if (!canPrompt()) return defaultYes;
+  if (!(io.interactive ?? canPrompt())) return defaultYes;
   // No cursor games. Terminal wrap width cannot be known reliably (process
   // .stdout.columns disagrees with the pty), and an erase that miscounts eats
   // the line above it. The flow simply reads top to bottom, and the summary
@@ -369,7 +409,7 @@ export async function askStep(
   console.log();
   console.log(`  ${brandText(label)}`);
   console.log(`  ${dimText(explanation)}`);
-  return confirm(`  ${question}`, defaultYes);
+  return confirm(`  ${question}`, defaultYes, io);
 }
 
 /** The brand violet, degraded to whatever this terminal can show. */
