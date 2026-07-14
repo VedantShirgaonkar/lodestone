@@ -1,7 +1,7 @@
 import { parseArgs } from "node:util";
 import { stdout, stderr } from "node:process";
 import { isatty } from "node:tty";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { loadConfig } from "../core/config.js";
 import {
@@ -9,7 +9,7 @@ import {
   readUsageCache,
   usageCachePath,
 } from "../core/realUsage.js";
-import { windowBurn, asPctOfWindow, switchTax } from "../core/usage.js";
+import { windowBurn, switchTax } from "../core/usage.js";
 import {
   parseSession,
   latestSession,
@@ -32,6 +32,7 @@ import {
 } from "../util/ansi.js";
 import { resolveActingProfile, adoptDefault, loggedInHint } from "../core/profiles.js";
 import { versionOf } from "../core/claudeCli.js";
+import { keepaliveStateDir, pidAlive } from "../core/keepalive.js";
 
 interface CommandOptions {
   json: boolean;
@@ -60,6 +61,9 @@ interface QuotaBar {
   resetIn: string;
   source: string;
   pacing?: number;
+  /** Measured weighted tokens from the local burn model, shown when there is
+   *  no live percentage. Never converted to a % of a guessed plan budget. */
+  estBurnTokens?: number;
 }
 
 interface SessionLine {
@@ -158,29 +162,29 @@ async function buildFrame(
     );
 
     // getQuota's estimate branch returns no figures by design — the caller
-    // owns the fallback. Fill the 5h numbers from the local burn model so
-    // the bar shows the estimate instead of a misleading 0%.
+    // owns the fallback. Report what the burn model actually measured, in
+    // weighted tokens. This used to convert the burn into a percentage of a
+    // guessed plan budget and render it on the same bar as live data, which
+    // is the exact fabrication the hard rules ban and status.ts refuses:
+    // dividing a real measurement by an assumption produces "9297%".
+    let estimateBurnTokens: number | undefined;
     if (quota.source === "estimate") {
       try {
         const burnResult = await windowBurn(configDir, now);
-        if (burnResult.minutesRemaining > 0) {
-          const plan = (((config.settings as Record<string, unknown>)
-            ?.plan as string | undefined) ?? "pro") as
-            | "pro"
-            | "max5"
-            | "max20"
-            | "team";
-          quota.fiveHourUtilization = asPctOfWindow(burnResult.burn, plan);
+        if (burnResult.minutesRemaining > 0 && burnResult.burn > 0) {
+          estimateBurnTokens = burnResult.burn;
+          // The reset time IS measured (window start from our own
+          // transcripts plus the five-hour constant), so it can be shown.
           quota.fiveHourResetsAt =
             Math.floor(now.getTime() / 1000) + burnResult.minutesRemaining * 60;
         }
       } catch {
-        // leave undefined; bar renders "?"
+        // leave undefined; bar renders "no recent data"
       }
     }
 
     // Build 5h bar
-    const fiveHourBar = buildQuotaBar(quota, "fiveHour");
+    const fiveHourBar = buildQuotaBar(quota, "fiveHour", estimateBurnTokens);
 
     // Build 7d bar
     const sevenDayBar = buildQuotaBar(quota, "sevenDay");
@@ -250,7 +254,8 @@ async function buildFrame(
 
 function buildQuotaBar(
   quota: any,
-  field: "fiveHour" | "sevenDay"
+  field: "fiveHour" | "sevenDay",
+  estimateBurnTokens?: number
 ): QuotaBar {
   const isSevenDay = field === "sevenDay";
   const utilField = isSevenDay ? "sevenDayUtilization" : "fiveHourUtilization";
@@ -289,13 +294,17 @@ function buildQuotaBar(
     pacing = Math.round((100 * (windowMinutes - remainingMins)) / windowMinutes);
   }
 
-  return {
+  const bar: QuotaBar = {
     used: Math.round(used),
     hasData,
     resetIn,
     source: source === "statusline" ? "live" : source === "oauth" ? "live" : "est",
     pacing,
   };
+  if (!hasData && estimateBurnTokens !== undefined) {
+    bar.estBurnTokens = estimateBurnTokens;
+  }
+  return bar;
 }
 
 async function getRecentSessions(
@@ -341,8 +350,11 @@ async function getRecentSessions(
         const cacheTTL = Math.max(0, 60 - idleMinutes);
         const ttlStr = cacheTTL <= 0 ? "cold" : `${cacheTTL}m`;
 
+        // Name the project from the transcript's cwd, like status does. The
+        // munged directory name is truthful but unreadable, and reversing it
+        // is impossible.
         sessions.push({
-          project: projectMunged,
+          project: parsed.meta.cwd ? basename(parsed.meta.cwd) : projectMunged,
           contextTokens,
           cacheTTL: ttlStr,
         });
@@ -359,11 +371,10 @@ async function getRecentSessions(
 
 function getKeepaliveStatus(): string | null {
   try {
-    // Check for keepalive pidfile in ~/.config/lodestone/keepalive-*.json
-    const homeDir = process.env.HOME;
-    if (!homeDir) return null;
-
-    const keepaliveDir = join(homeDir, ".config", "lodestone");
+    // The same rules as `keepalive --status`: the real state dir (honors
+    // XDG_CONFIG_HOME, no HOME required), and a pid is a claim to verify, not
+    // a fact to repeat — the dash must not display a scheduler that died.
+    const keepaliveDir = keepaliveStateDir();
     if (!existsSync(keepaliveDir)) return null;
 
     const files = readdirSync(keepaliveDir);
@@ -371,19 +382,17 @@ function getKeepaliveStatus(): string | null {
       f.startsWith("keepalive-") && f.endsWith(".json")
     );
 
-    if (keepaliveFiles.length === 0) return null;
-
-    // Read the first active one
     for (const file of keepaliveFiles) {
       try {
         const data = JSON.parse(
           readFileSync(join(keepaliveDir, file), "utf8")
         ) as {
           profile?: string;
+          pid?: number;
           pings?: unknown[];
           cap?: number;
         };
-        if (data.profile) {
+        if (data.profile && pidAlive(data.pid)) {
           const pingCount = (data.pings as unknown[])?.length ?? 0;
           const cap = data.cap ?? 3;
           return `keepalive ${data.profile}: ${pingCount}/${cap} pings`;
@@ -468,6 +477,18 @@ function renderFrame(frame: DashFrame): void {
 
 function renderQuotaBar(label: string, q: QuotaBar): string {
   if (!q.hasData) {
+    // The measured burn, in the only unit we can state honestly without live
+    // data. No bar: a bar implies a known budget.
+    if (q.estBurnTokens !== undefined) {
+      const tok =
+        q.estBurnTokens >= 1_000_000
+          ? `${(q.estBurnTokens / 1_000_000).toFixed(1)}M`
+          : q.estBurnTokens >= 1_000
+            ? `${Math.round(q.estBurnTokens / 1000)}k`
+            : String(q.estBurnTokens);
+      const reset = q.resetIn !== "?" ? ` · resets in ${q.resetIn}` : "";
+      return `  ${label} ~${tok} wtok used${reset} · ${dim("(est — for real %, run: lodestone init --statusline)")}`;
+    }
     return `  ${label} ${dim("no recent data")} · ${dim(`(${q.source})`)}`;
   }
   // Estimates can legitimately exceed 100% (burn model vs plan budget);

@@ -122,3 +122,54 @@ test("dash --once: renders multiple profiles", async () => {
   assert.match(stdout, /work/, "should show work profile");
   await rm(testHome, { recursive: true, force: true });
 });
+
+test("dash --once: estimate shows measured tokens, never a percentage of a guessed budget", async () => {
+  const testHome = resolve(testDir, "home-est");
+  const configDir = resolve(testHome, ".claude");
+  await mkdir(resolve(testHome, ".config/lodestone"), { recursive: true });
+  await writeFile(
+    resolve(testHome, ".config/lodestone/config.json"),
+    JSON.stringify({ schema: 1, profiles: { personal: { configDir } }, settings: {} })
+  );
+
+  // A live session with real usage, but no statusline bridge: the estimate
+  // path. Dash used to convert this burn into a percentage of an assumed
+  // plan budget and render it on the same bar style as live data.
+  const projectDir = resolve(configDir, "projects", "-work-app");
+  await mkdir(projectDir, { recursive: true });
+  const now = new Date().toISOString();
+  await writeFile(
+    resolve(projectDir, "sess-est.jsonl"),
+    JSON.stringify({
+      type: "assistant",
+      uuid: "a1",
+      sessionId: "sess-est",
+      timestamp: now,
+      cwd: "/work/app",
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "hi" }],
+        usage: {
+          input_tokens: 5000,
+          output_tokens: 1000,
+          cache_read_input_tokens: 100000,
+          cache_creation_input_tokens: 20000,
+        },
+      },
+    }) + "\n"
+  );
+
+  const { stdout, code } = await runDash({
+    HOME: testHome,
+    XDG_CONFIG_HOME: resolve(testHome, ".config"),
+    NO_COLOR: "1",
+  });
+
+  assert.equal(code, 0);
+  assert.match(stdout, /5h ~[\d.]+[kM]? wtok used/, `measured tokens: ${stdout}`);
+  assert.match(stdout, /est/, "and labeled as an estimate");
+  // The 5h line must carry no percentage at all without live data.
+  const fiveHourLine = stdout.split("\n").find((l) => l.includes("5h")) ?? "";
+  assert.doesNotMatch(fiveHourLine, /\d+%/, `no fabricated %: ${fiveHourLine}`);
+  await rm(testHome, { recursive: true, force: true });
+});
