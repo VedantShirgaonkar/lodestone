@@ -7,8 +7,8 @@
   </defs>
   <text x="10" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="start">downloads</text>
   <text x="110" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">▮ npm / day (0 on 07-19)</text>
-  <text x="320" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">— extension total (1154)</text>
+  <text x="320" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">— extension total (1156)</text>
   <text x="710" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="end">updates daily · 2026-07-19</text>
   <rect x="47.0" y="100.1" width="26.0" height="25.9" rx="3" fill="url(#g)" opacity="0.9"/><rect x="147.0" y="39.6" width="26.0" height="86.4" rx="3" fill="url(#g)" opacity="0.9"/><rect x="247.0" y="122.0" width="26.0" height="4.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="347.0" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="447.0" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="547.0" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="647.0" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/>
-  <polyline points="160.0,64.3 260.0,40.5 360.0,40.0 460.0,39.9 560.0,39.7 660.0,39.6" fill="none" stroke="#4ad6f0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="160.0,64.4 260.0,40.6 360.0,40.2 460.0,40.0 560.0,39.9 660.0,39.6" fill="none" stroke="#4ad6f0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
