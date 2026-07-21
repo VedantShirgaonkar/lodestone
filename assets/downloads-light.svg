@@ -7,8 +7,8 @@
   </defs>
   <text x="10" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="12" font-weight="600" fill="#1f2328" text-anchor="start">downloads</text>
   <text x="110" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">▮ npm / day (0 on 07-21)</text>
-  <text x="320" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">— extension total (1164)</text>
+  <text x="320" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="start">— extension total (1168)</text>
   <text x="710" y="18" font-family="ui-sans-serif,system-ui,sans-serif" font-size="11" font-weight="400" fill="#59636e" text-anchor="end">updates daily · 2026-07-21</text>
   <rect x="35.9" y="100.1" width="26.0" height="25.9" rx="3" fill="url(#g)" opacity="0.9"/><rect x="113.7" y="39.6" width="26.0" height="86.4" rx="3" fill="url(#g)" opacity="0.9"/><rect x="191.4" y="122.0" width="26.0" height="4.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="269.2" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="347.0" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="424.8" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="502.6" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="580.3" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/><rect x="658.1" y="124.0" width="26.0" height="2.0" rx="3" fill="url(#g)" opacity="0.9"/>
-  <polyline points="126.7,64.8 204.4,41.2 282.2,40.8 360.0,40.6 437.8,40.5 515.6,40.2 593.3,39.6 671.1,39.6" fill="none" stroke="#4ad6f0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="126.7,65.0 204.4,41.5 282.2,41.1 360.0,40.9 437.8,40.8 515.6,40.5 593.3,39.9 671.1,39.6" fill="none" stroke="#4ad6f0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
