@@ -95,11 +95,15 @@ export async function parseSession(path: string): Promise<ParsedSession> {
   // Filter sidechains
   const mainThread = lines.filter((line) => !line.isSidechain);
 
-  // Dedupe assistant lines by message.id (or uuid), keeping last
-  const assistantMap = new Map<
-    string,
-    { line: TranscriptLine; index: number }
-  >();
+  // Dedupe assistant lines by message.id (or uuid).
+  // Claude Code writes one JSONL line per content block of the same assistant
+  // message, each line carrying the same message.id AND the same message.usage.
+  // Keeping only the last line drops every earlier block of the message —
+  // their tool_use blocks vanish from turns[].toolUses and the flattened
+  // toolUses list. When all lines of an id share identical usage, merge their
+  // content blocks (deduping exact duplicate blocks, which appear on retries);
+  // when usage differs (progressive rewrite), keep the last line as before.
+  const assistantGroups = new Map<string, TranscriptLine[]>();
   const nonAssistantLines: Array<{ line: TranscriptLine; originalIndex: number }> = [];
 
   for (let i = 0; i < mainThread.length; i++) {
@@ -110,10 +114,68 @@ export async function parseSession(path: string): Promise<ParsedSession> {
       const msg = line.message as Record<string, unknown> | undefined;
       const id = (msg?.id ?? line.uuid) as string | undefined;
       if (id) {
-        assistantMap.set(id, { line, index: i });
+        const group = assistantGroups.get(id) ?? [];
+        group.push(line);
+        assistantGroups.set(id, group);
       }
     } else {
       nonAssistantLines.push({ line, originalIndex: i });
+    }
+  }
+
+  const assistantMap = new Map<
+    string,
+    { line: TranscriptLine; index: number }
+  >();
+  // Preserve each id's position at its LAST occurrence, matching the old
+  // keep-last ordering.
+  const lastIndexById = new Map<string, number>();
+  for (let i = 0; i < mainThread.length; i++) {
+    const line = mainThread[i];
+    if (line?.type === "assistant") {
+      const msg = line.message as Record<string, unknown> | undefined;
+      const id = (msg?.id ?? line.uuid) as string | undefined;
+      if (id) lastIndexById.set(id, i);
+    }
+  }
+  for (const [id, group] of assistantGroups) {
+    const last = group[group.length - 1];
+    if (!last) continue;
+    const lastUsage = (last.message as Record<string, unknown> | undefined)?.usage;
+    const sameUsage = group.every(
+      (l) =>
+        JSON.stringify(
+          (l.message as Record<string, unknown> | undefined)?.usage
+        ) === JSON.stringify(lastUsage)
+    );
+    let merged = last;
+    if (group.length > 1 && sameUsage) {
+      const seen = new Set<string>();
+      const content: unknown[] = [];
+      for (const l of group) {
+        const msg = l.message as Record<string, unknown> | undefined;
+        const blocks = msg?.content;
+        if (Array.isArray(blocks)) {
+          for (const block of blocks) {
+            const key = JSON.stringify(block);
+            if (!seen.has(key)) {
+              seen.add(key);
+              content.push(block);
+            }
+          }
+        }
+      }
+      merged = {
+        ...last,
+        message: {
+          ...(last.message as Record<string, unknown>),
+          content,
+        },
+      };
+    }
+    const index = lastIndexById.get(id);
+    if (index !== undefined) {
+      assistantMap.set(id, { line: merged, index });
     }
   }
 
